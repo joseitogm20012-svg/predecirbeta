@@ -108,6 +108,9 @@ const labelWinB = document.getElementById("label-win-b");
 
 const xgValA = document.getElementById("xg-val-a");
 const xgValB = document.getElementById("xg-val-b");
+const xgSourceA = document.getElementById("xg-source-a");
+const xgSourceB = document.getElementById("xg-source-b");
+const dcRhoValue = document.getElementById("dc-rho-value");
 
 const scoreListContainer = document.getElementById("score-list-container");
 
@@ -426,6 +429,19 @@ async function runPredictionFlow() {
 
     xgValA.textContent = data.xgA.toFixed(2);
     xgValB.textContent = data.xgB.toFixed(2);
+    
+    // Mostrar fuente de xG (Mejora 2)
+    if (xgSourceA && xgSourceB) {
+        const sourceAText = data.xgSourceA === 'real' ? '🟢 xG Real' : '⚪ Estimado';
+        const sourceBText = data.xgSourceB === 'real' ? '🟢 xG Real' : '⚪ Estimado';
+        xgSourceA.textContent = sourceAText;
+        xgSourceB.textContent = sourceBText;
+    }
+    
+    // Mostrar correlación Dixon-Coles rho (Mejora 3)
+    if (dcRhoValue && data.dcRho !== undefined) {
+        dcRhoValue.textContent = data.dcRho.toFixed(2);
+    }
 
     // Render top scores
     scoreListContainer.innerHTML = "";
