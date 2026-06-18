@@ -9,9 +9,25 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_CSV_PATH = os.path.join(BASE_DIR, "data", "results.csv")
 ELO_PATH = os.path.join(BASE_DIR, "data", "elo-calibrated.json")
+XG_PATH = os.path.join(BASE_DIR, "data", "xg_by_team.json")
 
 # Core Dixon-Coles correlation adjustment
 DC_RHO = -0.13
+
+# Load xG data at module initialization
+_cached_xg_data = None
+def load_xg_data():
+    """Carga datos de xG por equipo."""
+    global _cached_xg_data
+    if _cached_xg_data is not None:
+        return _cached_xg_data
+    if os.path.exists(XG_PATH):
+        with open(XG_PATH, 'r', encoding='utf-8') as f:
+            xg_json = json.load(f)
+            _cached_xg_data = xg_json.get('teams', {})
+    else:
+        _cached_xg_data = {}
+    return _cached_xg_data
 
 # Team name to slug mapping
 NAME_TO_SLUG = {
@@ -377,11 +393,23 @@ def get_h2h_stats(team_a, team_b, matches):
     }
 
 def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings):
+    # Cargar datos de xG histórico real
+    xg_data = load_xg_data()
+    
+    # 1. Obtener xG real si está disponible (Mejora 2)
+    xg_real_a_home = None
+    xg_real_b_away = None
+    
+    if team_a in xg_data:
+        xg_real_a_home = xg_data[team_a].get('xg_home') or xg_data[team_a].get('xg_overall')
+    if team_b in xg_data:
+        xg_real_b_away = xg_data[team_b].get('xg_away') or xg_data[team_b].get('xg_overall')
+    
     # Get form stats
     gs_a, gc_a = get_team_form_stats(team_a, matches, ratings, half_life_months)
     gs_b, gc_b = get_team_form_stats(team_b, matches, ratings, half_life_months)
     
-    # 1. Base expected goals from historical forms
+    # 2. Base expected goals from historical forms
     xg_a = gs_a * gc_b
     xg_b = gs_b * gc_a
     
@@ -392,8 +420,20 @@ def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_l
         xg_a = max(0.3, 1.35 + (elo_a - elo_b) / 400.0)
     if xg_b <= 0.1:
         xg_b = max(0.3, 1.35 + (elo_b - elo_a) / 400.0)
+    
+    # 3. BLEND con xG real si está disponible (60% real, 40% modelo)
+    xg_source_a = "modelo"
+    xg_source_b = "modelo"
+    
+    if xg_real_a_home and xg_real_a_home > 0:
+        xg_a = 0.6 * xg_real_a_home + 0.4 * xg_a
+        xg_source_a = "real"
+    
+    if xg_real_b_away and xg_real_b_away > 0:
+        xg_b = 0.6 * xg_real_b_away + 0.4 * xg_b
+        xg_source_b = "real"
         
-    # 2. FIFA Ranking adjust
+    # 4. FIFA Ranking adjust
     rank_diff = rank_b - rank_a # positive = A is higher ranked
     fifa_mult_a = 1.0 + (rank_diff / 100.0) * fifa_weight
     fifa_mult_b = 1.0 - (rank_diff / 100.0) * fifa_weight
@@ -401,7 +441,7 @@ def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_l
     xg_a *= max(0.2, fifa_mult_a)
     xg_b *= max(0.2, fifa_mult_b)
     
-    # 3. H2H adjust
+    # 5. H2H adjust
     h2h = get_h2h_stats(team_a, team_b, matches)
     h2h_mult_a = 1.0
     h2h_mult_b = 1.0
@@ -415,7 +455,7 @@ def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_l
     xg_a = max(0.1, min(4.5, xg_a))
     xg_b = max(0.1, min(4.5, xg_b))
     
-    return xg_a, xg_b, h2h_mult_a, h2h_mult_b
+    return xg_a, xg_b, h2h_mult_a, h2h_mult_b, xg_source_a, xg_source_b
 
 def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weight_pct, half_life_months, num_sims, odds_a=None, odds_draw=None, odds_b=None):
     matches, ratings = load_data()
@@ -424,7 +464,7 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
     h2h_weight = h2h_weight_pct / 100.0
     
     # Calculate expected goals
-    xg_a, xg_b, h2h_mult_a, h2h_mult_b = calculate_xg(
+    xg_a, xg_b, h2h_mult_a, h2h_mult_b, xg_source_a, xg_source_b = calculate_xg(
         team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings
     )
     
@@ -531,9 +571,12 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
     return {
         "xgA": xg_a,
         "xgB": xg_b,
+        "xgSourceA": xg_source_a,
+        "xgSourceB": xg_source_b,
         "probWinA": sim_pct_a,
         "probDraw": sim_pct_draw,
         "probWinB": sim_pct_b,
         "topScores": top_scores,
-        "bettingAnalysis": betting_analysis
+        "bettingAnalysis": betting_analysis,
+        "dcRho": DC_RHO
     }
