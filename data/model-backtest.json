@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-06-20T01:43:00.043Z",
+  "method": "Walk-forward out-of-sample with Simulated Financial ROI.",
+  "totalMatches": 49477,
+  "evaluated": 49283,
+  "burnIn": 150,
+  "outcomeSplit": {
+    "home": 0.4901,
+    "draw": 0.2277,
+    "away": 0.2822
+  },
+  "model": {
+    "accuracy": 0.5771,
+    "brier": 0.5414,
+    "logloss": 0.9178,
+    "rps": 0.1845,
+    "ece": 0.0071
+  },
+  "financials": {
+    "margin": 1.05,
+    "minEdge": 0.05,
+    "betsPlaced": 25846,
+    "betsWon": 15154,
+    "profitUnits": 3964.45,
+    "roiPercent": 15.34
+  }
+}

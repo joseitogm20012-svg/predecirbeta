@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Walk-forward, OUT-OF-SAMPLE backtest of the model on real internationals (data/results.json).
-// Each match is predicted from ratings built ONLY on prior matches, then scored — no look-ahead.
+// Walk-forward, OUT-OF-SAMPLE backtest of the model on real internationals.
+// Includes ROI / Financial Backtesting with a Simulated Bookmaker.
 //   node backtest.mjs
 import { readFileSync, writeFileSync } from "node:fs";
 import { matchProb, expectedScore } from "./elo.mjs";
@@ -19,56 +19,137 @@ const baseK = (n = "") => { n = n.toLowerCase();
   return 28; };
 const gMult = (gd) => { const d = Math.abs(gd); return d <= 1 ? 1 : d === 2 ? 1.5 : (11 + d) / 8; };
 
-const { matches } = JSON.parse(readFileSync(D("results.json"), "utf8"));
+// Parse CSV instead of JSON
+let matches = [];
+try {
+  const csvText = readFileSync(D("results.csv"), "utf8");
+  const lines = csvText.trim().split(/\r?\n/);
+  for (let i = 1; i < lines.length; i++) {
+    const p = lines[i].split(',');
+    if (p.length < 6) continue;
+    const date = p[0], homeName = p[1], awayName = p[2], hgStr = p[3], agStr = p[4], leagueName = p[5];
+    if (!homeName || !awayName) continue;
+    const hg = (hgStr === 'NA' || isNaN(parseInt(hgStr))) ? null : parseInt(hgStr);
+    const ag = (agStr === 'NA' || isNaN(parseInt(agStr))) ? null : parseInt(agStr);
+    const homeSlug = homeName.toLowerCase().replace(/ /g, '-').replace(/'/g, '').replace(/\./g, '');
+    const awaySlug = awayName.toLowerCase().replace(/ /g, '-').replace(/'/g, '').replace(/\./g, '');
+    matches.push({ date, homeName, awayName, hg, ag, leagueName, homeSlug, awaySlug });
+  }
+} catch (e) {
+  console.error("No se pudo leer data/results.csv. Asegúrate de ejecutar update_results.bat primero.");
+  process.exit(1);
+}
+
+// Trackers
 const R = {};
-const getR = (s, nm) => { const k = s ?? `ghost:${nm}`; if (R[k] == null) R[k] = s && SEED[s] != null ? SEED[s] : 1500; return R[k]; };
-const setR = (s, nm, v) => { R[s ?? `ghost:${nm}`] = v; };
+const naiveR = {}; // Bookmaker's Elo (basic)
+
+const getR = (dict, s, nm) => { const k = s ?? `ghost:${nm}`; if (dict[k] == null) dict[k] = s && SEED[s] != null ? SEED[s] : 1500; return dict[k]; };
+const setR = (dict, s, nm, v) => { dict[s ?? `ghost:${nm}`] = v; };
 
 let n = 0, hit = 0, brier = 0, logloss = 0, favN = 0, favHit = 0, baseHome = 0, baseElo = 0, i = 0;
 let eH = 0, eD = 0, eA = 0;
-// RPS (Ranked Probability Score) — the standard proper scoring rule for ORDERED 1X2 outcomes:
-// 0.5 * [ (P(home)−Y(home))² + (P(home+draw)−Y(home+draw))² ]. Lower = better.
+
+// Financial metrics
+let bankroll = 0; // units
+let betsPlaced = 0;
+let betsWon = 0;
+const VIG_MARGIN = 1.05; // 5% bookmaker margin
+const MIN_EDGE = 0.05; // Bet only if we have at least 5% expected value
+const BET_SIZE = 1; // 1 unit per bet
+
 let rps = 0, rpsU = 0;
 const rps3 = (p, y) => 0.5 * ((p[0] - y[0]) ** 2 + (p[0] + p[1] - y[0] - y[1]) ** 2);
-// Calibration: pool every (predicted prob, outcome) pair across all 3 outcomes into 10 bins
-// → reliability curve + Expected Calibration Error.
 const BINS = 10;
 const calib = Array.from({ length: BINS }, () => ({ sumP: 0, sumY: 0, n: 0 }));
+
 for (const m of matches) {
   if (m.hg == null || m.ag == null) continue;
-  const ra = getR(m.homeSlug, m.homeName), rb = getR(m.awaySlug, m.awayName);
+  
+  // Advanced Model Ratings
+  const ra = getR(R, m.homeSlug, m.homeName);
+  const rb = getR(R, m.awaySlug, m.awayName);
+  
+  // Naive Bookmaker Ratings
+  const naiveRa = getR(naiveR, m.homeSlug, m.homeName);
+  const naiveRb = getR(naiveR, m.awaySlug, m.awayName);
+  
   if (i >= BURN_IN) {
     const p = matchProb(ra, rb, HOME_ADV);
     const probs = [p.winA, p.draw, p.winB];
     const actual = m.hg > m.ag ? 0 : m.hg < m.ag ? 2 : 1;
     const y = [actual === 0 ? 1 : 0, actual === 1 ? 1 : 0, actual === 2 ? 1 : 0];
     const pred = probs.indexOf(Math.max(...probs));
+    
     if (pred === actual) hit++;
     brier += (probs[0]-y[0])**2 + (probs[1]-y[1])**2 + (probs[2]-y[2])**2;
     logloss += -Math.log(Math.max(1e-12, probs[actual]));
     rps += rps3(probs, y); rpsU += rps3([1/3, 1/3, 1/3], y);
+    
     for (let k = 0; k < 3; k++) {
       const b = Math.min(BINS - 1, Math.floor(probs[k] * BINS));
       calib[b].sumP += probs[k]; calib[b].sumY += y[k]; calib[b].n++;
     }
+    
     if (Math.max(...probs) >= 0.5) { favN++; if (pred === actual) favHit++; }
     if (actual === 0) baseHome++;
     if ((expectedScore(ra, rb, HOME_ADV) >= 0.5 ? 0 : 2) === actual) baseElo++;
     if (actual === 0) eH++; else if (actual === 1) eD++; else eA++;
+    
+    // --- FINANCIAL SIMULATION ---
+    // Generate Bookmaker odds using Naive Elo + 5% Vig
+    const naiveP = matchProb(naiveRa, naiveRb, 50); // Simpler home adv
+    const naiveProbs = [naiveP.winA, naiveP.draw, naiveP.winB];
+    
+    // Convert to decimal odds (e.g. fair prob 0.5 -> fair odds 2.0 -> vig odds 1.9)
+    const bookieOdds = naiveProbs.map(prob => 1 / (prob * VIG_MARGIN));
+    
+    // Look for value bets (Edge = ModelProb * BookieOdds - 1)
+    let betPlacedThisMatch = false;
+    for (let k = 0; k < 3; k++) {
+      // Evitamos apostar a probabilidades irracionales (menores al 5%)
+      if (probs[k] < 0.05) continue;
+      
+      const edge = (probs[k] * bookieOdds[k]) - 1;
+      
+      // If we find significant value, we bet 1 unit
+      if (edge > MIN_EDGE) {
+        betsPlaced += BET_SIZE;
+        if (actual === k) {
+          bankroll += (BET_SIZE * bookieOdds[k]) - BET_SIZE; // Profit
+          betsWon++;
+        } else {
+          bankroll -= BET_SIZE; // Loss
+        }
+        betPlacedThisMatch = true;
+        // Solo apostamos a un mercado por partido (el de mayor valor) para evitar sobreexposición
+        break; 
+      }
+    }
+    
     n++;
   }
+  
+  // Update Advanced Model (Dynamic K, Goal Difference multiplier)
   const exp = expectedScore(ra, rb, HOME_ADV);
   const score = m.hg > m.ag ? 1 : m.hg < m.ag ? 0 : 0.5;
   const delta = baseK(m.leagueName) * gMult(m.hg - m.ag) * (score - exp);
-  setR(m.homeSlug, m.homeName, ra + delta);
-  setR(m.awaySlug, m.awayName, rb - delta);
+  setR(R, m.homeSlug, m.homeName, ra + delta);
+  setR(R, m.awaySlug, m.awayName, rb - delta);
+  
+  // Update Naive Model (Flat K=20, no multipliers)
+  const naiveExp = expectedScore(naiveRa, naiveRb, 50);
+  const naiveDelta = 20 * (score - naiveExp);
+  setR(naiveR, m.homeSlug, m.homeName, naiveRa + naiveDelta);
+  setR(naiveR, m.awaySlug, m.awayName, naiveRb - naiveDelta);
+  
   i++;
 }
 
 const pct = (x) => (x * 100).toFixed(1) + "%";
 console.log(`\n=== Walk-forward backtest — ${n} of ${matches.length} matches (burn-in ${BURN_IN}) ===`);
 console.log(`Eval outcome split: home ${pct(eH/n)}  draw ${pct(eD/n)}  away ${pct(eA/n)}\n`);
-console.log(`MODEL`);
+console.log(`MODEL METRICS`);
 console.log(`  Accuracy (top pick):   ${pct(hit/n)}`);
 console.log(`  Favourite acc (p≥50%): ${pct(favHit/favN)}  (${favN} matches)`);
 console.log(`  Brier (3-way, ↓):      ${(brier/n).toFixed(3)}`);
@@ -76,29 +157,36 @@ console.log(`  Log-loss (↓):          ${(logloss/n).toFixed(3)}`);
 console.log(`  RPS (↓):               ${(rps/n).toFixed(4)}`);
 const ece = calib.reduce((s, b) => s + (b.n ? Math.abs(b.sumP / b.n - b.sumY / b.n) * b.n : 0), 0) / (3 * n);
 console.log(`  ECE (calibration, ↓):  ${(ece * 100).toFixed(1)}%\n`);
-console.log(`BASELINES (same matches)`);
+
+console.log(`FINANCIAL BACKTESTING (Simulated Bookmaker)`);
+console.log(`  Bookmaker Margin (Vig): ${((VIG_MARGIN - 1)*100).toFixed(1)}%`);
+console.log(`  Minimum Edge to Bet:   ${(MIN_EDGE*100).toFixed(1)}%`);
+console.log(`  Total Bets Placed:     ${betsPlaced}  (${(betsPlaced/n * 100).toFixed(1)}% of matches)`);
+if (betsPlaced > 0) {
+  console.log(`  Bets Won:              ${betsWon} (${pct(betsWon/betsPlaced)} Hit Rate)`);
+  const roi = (bankroll / betsPlaced) * 100;
+  console.log(`  Profit/Loss (P&L):     ${bankroll >= 0 ? '+' : ''}${bankroll.toFixed(2)} Units`);
+  console.log(`  Yield (ROI):           ${roi >= 0 ? '+' : ''}${roi.toFixed(2)}%`);
+}
+console.log(`\nBASELINES`);
 console.log(`  Always pick home:      ${pct(baseHome/n)}`);
 console.log(`  Pick higher-Elo team:  ${pct(baseElo/n)}`);
-console.log(`  Coin-flip (uniform):   Brier ${(2*(1/3)**2+(1-1/3)**2).toFixed(3)} · log-loss ${(-Math.log(1/3)).toFixed(3)} · RPS ${(rpsU/n).toFixed(4)}\n`);
-console.log(`CALIBRATION (reliability — predicted vs observed per probability band)`);
-for (const [k, b] of calib.entries()) {
-  if (!b.n) continue;
-  console.log(`  ${String(k*10).padStart(2)}–${String((k+1)*10).padStart(3)}%   model said ${(b.sumP/b.n*100).toFixed(0).padStart(3)}%  →  happened ${(b.sumY/b.n*100).toFixed(0).padStart(3)}%   (n=${b.n})`);
-}
-console.log(`\nLive title odds (full 50k-sim tournament model, conditioned on real results): https://cup26matches.com`);
 
-// Persist the metrics so data/model-backtest.json always matches a fresh `node backtest.mjs` run.
-writeFileSync(new URL("./data/model-backtest.json", import.meta.url), JSON.stringify({
+// Persist the metrics
+writeFileSync(D("model-backtest.json"), JSON.stringify({
   generatedAt: new Date().toISOString(),
-  method: "Walk-forward out-of-sample: each match predicted from ratings built only on prior matches; Elo updated after. Burn-in skipped.",
+  method: "Walk-forward out-of-sample with Simulated Financial ROI.",
   totalMatches: matches.length, evaluated: n, burnIn: BURN_IN,
   outcomeSplit: { home: +(eH/n).toFixed(4), draw: +(eD/n).toFixed(4), away: +(eA/n).toFixed(4) },
   model: { accuracy: +(hit/n).toFixed(4), brier: +(brier/n).toFixed(4), logloss: +(logloss/n).toFixed(4),
-           rps: +(rps/n).toFixed(4), ece: +ece.toFixed(4), favouriteAccuracy: +(favHit/favN).toFixed(4), favouriteCount: favN },
-  baselines: { alwaysHome: +(baseHome/n).toFixed(4), eloPickNoDraw: +(baseElo/n).toFixed(4),
-               uniformBrier: 0.6667, uniformLogloss: 1.0986, uniformRps: +(rpsU/n).toFixed(4) },
-  calibration: { bins: calib.map((c,k)=>({ range:[k/10,(k+1)/10], n:c.n,
-    avgPred: c.n? +(c.sumP/c.n).toFixed(4):null, obsFreq: c.n? +(c.sumY/c.n).toFixed(4):null })),
-    ece: +ece.toFixed(4) },
+           rps: +(rps/n).toFixed(4), ece: +ece.toFixed(4) },
+  financials: {
+    margin: VIG_MARGIN,
+    minEdge: MIN_EDGE,
+    betsPlaced: betsPlaced,
+    betsWon: betsWon,
+    profitUnits: +bankroll.toFixed(2),
+    roiPercent: betsPlaced > 0 ? +((bankroll / betsPlaced) * 100).toFixed(2) : 0
+  }
 }, null, 2) + "\n");
-console.log("→ wrote data/model-backtest.json");
+console.log("\n→ wrote data/model-backtest.json");

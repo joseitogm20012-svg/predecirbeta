@@ -6,9 +6,15 @@ de las selecciones nacionales basado en datos históricos.
 
 import json
 import csv
+import sys
 import math
 from pathlib import Path
 from datetime import datetime
+
+# Forzar salida UTF-8 en Windows
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 BASE_DIR = Path(__file__).parent
 RESULTS_CSV = BASE_DIR / "results.csv"
@@ -262,7 +268,7 @@ def calculate_elo_from_results():
 
 def main():
     print("=" * 60)
-    print("📊 Generando Ratings Elo Calibrados")
+    print("  Generando Ratings Elo Calibrados")
     print("=" * 60)
     
     ratings = calculate_elo_from_results()
@@ -278,12 +284,12 @@ def main():
     with open(ELO_OUTPUT, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
     
-    print(f"✅ Ratings Elo guardados en {ELO_OUTPUT}")
-    print(f"📈 Total de equipos: {len(ratings)}")
+    print(f"OK - Ratings Elo guardados en {ELO_OUTPUT}")
+    print(f"   Total de equipos: {len(ratings)}")
     
     # Mostrar top 10
     sorted_ratings = sorted(ratings.items(), key=lambda x: x[1], reverse=True)[:10]
-    print("\n🏆 Top 10 equipos:")
+    print("\nTop 10 equipos:")
     for i, (team, elo) in enumerate(sorted_ratings, 1):
         print(f"   {i}. {team.title()}: {elo:.0f}")
     

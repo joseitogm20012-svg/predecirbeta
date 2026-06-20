@@ -960,3 +960,149 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: .4; }
 }
+
+/* ==========================================================================
+   GOALS MARKETS & CORNERS STYLING (NEW)
+   ========================================================================== */
+.markets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.market-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border-inner);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+}
+
+.market-box h4 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.market-odds-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.market-odds-row div {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex: 1;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.market-odds-row span {
+  color: var(--color-text-secondary);
+}
+
+.market-odds-row strong {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* Over Under Tables */
+.ou-table-container {
+  overflow-x: auto;
+  margin-top: 4px;
+}
+
+.ou-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.ou-table th {
+  padding: 6px 12px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ou-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  font-weight: 500;
+}
+
+.ou-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Corners expected visualizer */
+.corners-expected-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border-inner);
+  border-radius: var(--border-radius-md);
+  padding: 16px;
+  margin-top: 10px;
+  gap: 12px;
+}
+
+.expected-corners-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  text-align: center;
+}
+
+.expected-corners-box span {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.expected-corners-box strong {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fff;
+  font-family: var(--font-family-title);
+}
+
+.expected-corners-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 16px;
+  border-left: 1px solid var(--panel-border);
+  border-right: 1px solid var(--panel-border);
+}
+
+.expected-corners-divider span {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.expected-corners-divider strong {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  font-family: var(--font-family-title);
+  text-shadow: 0 0 10px var(--color-primary-glow);
+}

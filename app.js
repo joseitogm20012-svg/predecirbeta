@@ -4,59 +4,68 @@
 // Mapping of Slugs to Country Details (Flags)
 const TEAM_METADATA = {
   "argentina": { name: "Argentina", flag: "🇦🇷", rank: 1 },
-  "france": { name: "Francia", flag: "🇫🇷", rank: 2 },
-  "spain": { name: "España", flag: "🇪🇸", rank: 3 },
-  "brazil": { name: "Brasil", flag: "🇧🇷", rank: 4 },
-  "england": { name: "Inglaterra", flag: "🇬🇧", rank: 5 },
-  "portugal": { name: "Portugal", flag: "🇵🇹", rank: 6 },
-  "netherlands": { name: "Países Bajos", flag: "🇳🇱", rank: 7 },
-  "germany": { name: "Alemania", flag: "🇩🇪", rank: 8 },
+  "france": { name: "Francia", flag: "🇫🇷", rank: 3 },
+  "spain": { name: "España", flag: "🇪🇸", rank: 2 },
+  "brazil": { name: "Brasil", flag: "🇧🇷", rank: 6 },
+  "england": { name: "Inglaterra", flag: "🇬🇧", rank: 4 },
+  "portugal": { name: "Portugal", flag: "🇵🇹", rank: 5 },
+  "netherlands": { name: "Países Bajos", flag: "🇳🇱", rank: 8 },
+  "germany": { name: "Alemania", flag: "🇩🇪", rank: 10 },
+  "austria": { name: "Austria", flag: "🇦🇹", rank: 24 },
   "belgium": { name: "Bélgica", flag: "🇧🇪", rank: 9 },
-  "italy": { name: "Italia", flag: "🇮🇹", rank: 10 },
-  "colombia": { name: "Colombia", flag: "🇨🇴", rank: 11 },
-  "croatia": { name: "Croacia", flag: "🇭🇷", rank: 12 },
-  "morocco": { name: "Marruecos", flag: "🇲🇦", rank: 13 },
-  "usa": { name: "Estados Unidos", flag: "🇺🇸", rank: 14 },
-  "switzerland": { name: "Suiza", flag: "🇨🇭", rank: 15 },
+  "italy": { name: "Italia", flag: "🇮🇹", rank: 12 },
+  "colombia": { name: "Colombia", flag: "🇨🇴", rank: 13 },
+  "croatia": { name: "Croacia", flag: "🇭🇷", rank: 11 },
+  "morocco": { name: "Marruecos", flag: "🇲🇦", rank: 7 },
+  "usa": { name: "Estados Unidos", flag: "🇺🇸", rank: 17 },
+  "switzerland": { name: "Suiza", flag: "🇨🇭", rank: 19 },
   "uruguay": { name: "Uruguay", flag: "🇺🇾", rank: 16 },
-  "japan": { name: "Japón", flag: "🇯🇵", rank: 17 },
-  "mexico": { name: "México", flag: "🇲🇽", rank: 18 },
-  "senegal": { name: "Senegal", flag: "🇸🇳", rank: 19 },
-  "denmark": { name: "Dinamarca", flag: "🇩🇰", rank: 20 },
-  "iran": { name: "Irán", flag: "🇮🇷", rank: 21 },
-  "ecuador": { name: "Ecuador", flag: "🇪🇨", rank: 22 },
-  "australia": { name: "Australia", flag: "🇦🇺", rank: 23 },
+  "japan": { name: "Japón", flag: "🇯🇵", rank: 18 },
+  "mexico": { name: "México", flag: "🇲🇽", rank: 14 },
+  "senegal": { name: "Senegal", flag: "🇸🇳", rank: 15 },
+  "denmark": { name: "Dinamarca", flag: "🇩🇰", rank: 21 },
+  "iran": { name: "Irán", flag: "🇮🇷", rank: 20 },
+  "ecuador": { name: "Ecuador", flag: "🇪🇨", rank: 23 },
+  "australia": { name: "Australia", flag: "🇦🇺", rank: 27 },
   "south-korea": { name: "Corea del Sur", flag: "🇰🇷", rank: 25 },
-  "poland": { name: "Polonia", flag: "🇵🇱", rank: 26 },
-  "wales": { name: "Gales", flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", rank: 29 },
-  "nigeria": { name: "Nigeria", flag: "🇳🇬", rank: 30 },
-  "peru": { name: "Perú", flag: "🇵🇪", rank: 31 },
-  "serbia": { name: "Serbia", flag: "🇷🇸", rank: 32 },
-  "qatar": { name: "Catar", flag: "🇶🇦", rank: 34 },
-  "czech-republic": { name: "República Checa", flag: "🇨🇿", rank: 35 },
-  "egypt": { name: "Egipto", flag: "🇪🇬", rank: 36 },
-  "ivory-coast": { name: "Costa de Marfil", flag: "🇨🇮", rank: 38 },
-  "scotland": { name: "Escocia", flag: "🏴\u200d%7F", rank: 39 }, // fallback
-  "canada": { name: "Canadá", flag: "🇨🇦", rank: 40 },
-  "tunisia": { name: "Túnez", flag: "🇹🇳", rank: 41 },
-  "chile": { name: "Chile", flag: "🇨🇱", rank: 42 },
-  "algeria": { name: "Argelia", flag: "🇩🇿", rank: 43 },
-  "panama": { name: "Panamá", flag: "🇵🇦", rank: 45 },
-  "cameroon": { name: "Camerún", flag: "🇨🇲", rank: 51 },
-  "jamaica": { name: "Jamaica", flag: "🇯🇲", rank: 53 },
-  "venezuela": { name: "Venezuela", flag: "🇻🇪", rank: 54 },
-  "paraguay": { name: "Paraguay", flag: "🇵🇾", rank: 56 },
-  "south-africa": { name: "Sudáfrica", flag: "🇿🇦", rank: 59 },
+  "poland": { name: "Polonia", flag: "🇵🇱", rank: 36 },
+  "wales": { name: "Gales", flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", rank: 38 },
+  "nigeria": { name: "Nigeria", flag: "🇳🇬", rank: 26 },
+  "peru": { name: "Perú", flag: "🇵🇪", rank: 52 },
+  "serbia": { name: "Serbia", flag: "🇷🇸", rank: 43 },
+  "qatar": { name: "Catar", flag: "🇶🇦", rank: 56 },
+  "czech-republic": { name: "República Checa", flag: "🇨🇿", rank: 40 },
+  "egypt": { name: "Egipto", flag: "🇪🇬", rank: 29 },
+  "ivory-coast": { name: "Costa de Marfil", flag: "🇨🇮", rank: 33 },
+  "scotland": { name: "Escocia", flag: "🏴\u200d%7F", rank: 42 },
+  "canada": { name: "Canadá", flag: "🇨🇦", rank: 30 },
+  "tunisia": { name: "Túnez", flag: "🇹🇳", rank: 45 },
+  "chile": { name: "Chile", flag: "🇨🇱", rank: 51 },
+  "algeria": { name: "Argelia", flag: "🇩🇿", rank: 28 },
+  "panama": { name: "Panamá", flag: "🇵🇦", rank: 34 },
+  "cameroon": { name: "Camerún", flag: "🇨🇲", rank: 45 },
+  "jamaica": { name: "Jamaica", flag: "🇯🇲", rank: 71 },
+  "venezuela": { name: "Venezuela", flag: "🇻🇪", rank: 48 },
+  "paraguay": { name: "Paraguay", flag: "🇵🇾", rank: 41 },
+  "south-africa": { name: "Sudáfrica", flag: "🇿🇦", rank: 60 },
   "saudi-arabia": { name: "Arabia Saudita", flag: "🇸🇦", rank: 61 },
-  "ghana": { name: "Ghana", flag: "🇬🇭", rank: 64 },
-  "jordan": { name: "Jordania", flag: "🇯🇴", rank: 68 },
-  "bosnia-and-herzegovina": { name: "Bosnia & Herzegovina", flag: "🇧🇦", rank: 74 },
-  "honduras": { name: "Honduras", flag: "🇭🇳", rank: 79 },
-  "el-salvador": { name: "El Salvador", flag: "🇸🇻", rank: 81 },
+  "ghana": { name: "Ghana", flag: "🇬🇭", rank: 73 },
+  "jordan": { name: "Jordania", flag: "🇯🇴", rank: 63 },
+  "bosnia-and-herzegovina": { name: "Bosnia & Herzegovina", flag: "🇧🇦", rank: 64 },
+  "honduras": { name: "Honduras", flag: "🇭🇳", rank: 65 },
+  "el-salvador": { name: "El Salvador", flag: "🇸🇻", rank: 100 },
   "new-zealand": { name: "Nueva Zelanda", flag: "🇳🇿", rank: 85 },
-  "haiti": { name: "Haití", flag: "🇭🇹", rank: 86 },
-  "trinidad-and-tobago": { name: "Trinidad y Tobago", flag: "🇹🇹", rank: 98 },
-  "guatemala": { name: "Guatemala", flag: "🇬🇹", rank: 103 }
+  "haiti": { name: "Haití", flag: "🇭🇹", rank: 83 },
+  "trinidad-and-tobago": { name: "Trinidad y Tobago", flag: "🇹🇹", rank: 102 },
+  "guatemala": { name: "Guatemala", flag: "🇬🇹", rank: 97 },
+  "norway": { name: "Noruega", flag: "🇳🇴", rank: 31 },
+  "sweden": { name: "Suecia", flag: "🇸🇪", rank: 38 },
+  "turkey": { name: "Turquía", flag: "🇹🇷", rank: 27 },
+  "uae": { name: "Emiratos Árabes Unidos", flag: "🇦🇪", rank: 68 },
+  "iraq": { name: "Irak", flag: "🇮🇶", rank: 57 },
+  "cape-verde": { name: "Cabo Verde", flag: "🇨🇻", rank: 67 },
+  "dr-congo": { name: "República Dem. del Congo", flag: "🇨🇩", rank: 43 },
+  "curacao": { name: "Curazao", flag: "🇨🇼", rank: 82 }
 };
 
 // State Variables
@@ -123,6 +132,33 @@ const evPctB = document.getElementById("ev-pct-b");
 const evLabelA = document.getElementById("ev-label-a");
 const evLabelB = document.getElementById("ev-label-b");
 const oddsAlertMessage = document.getElementById("odds-alert-message");
+
+// New markets and corners DOM elements
+const goalsMarketsCard = document.getElementById("goals-markets-card");
+const cornersPredictionCard = document.getElementById("corners-prediction-card");
+
+const bttsYes = document.getElementById("market-btts-yes");
+const bttsNo = document.getElementById("market-btts-no");
+const dc1X = document.getElementById("market-dc-1X");
+const dc12 = document.getElementById("market-dc-12");
+const dcX2 = document.getElementById("market-dc-X2");
+const dnb1 = document.getElementById("market-dnb-1");
+const dnb2 = document.getElementById("market-dnb-2");
+const labelDnb1 = document.getElementById("label-dnb-1");
+const labelDnb2 = document.getElementById("label-dnb-2");
+const ouGoalsTbody = document.getElementById("ou-goals-tbody");
+
+const expectedCornersValA = document.getElementById("expected-corners-val-a");
+const expectedCornersValB = document.getElementById("expected-corners-val-b");
+const expectedCornersTotal = document.getElementById("expected-corners-total");
+const expectedCornersLabelA = document.getElementById("expected-corners-label-a");
+const expectedCornersLabelB = document.getElementById("expected-corners-label-b");
+const ouCornersTbody = document.getElementById("ou-corners-tbody");
+const probMostCornersA = document.getElementById("prob-most-corners-a");
+const probMostCornersDraw = document.getElementById("prob-most-corners-draw");
+const probMostCornersB = document.getElementById("prob-most-corners-b");
+const labelMostCornersA = document.getElementById("label-most-corners-a");
+const labelMostCornersB = document.getElementById("label-most-corners-b");
 
 // Tabs Elements
 const tabHistoryBtn = document.getElementById("tab-btn-history");
@@ -432,10 +468,13 @@ async function runPredictionFlow() {
     
     // Mostrar fuente de xG (Mejora 2)
     if (xgSourceA && xgSourceB) {
-        const sourceAText = data.xgSourceA === 'real' ? '🟢 xG Real' : '⚪ Estimado';
-        const sourceBText = data.xgSourceB === 'real' ? '🟢 xG Real' : '⚪ Estimado';
-        xgSourceA.textContent = sourceAText;
-        xgSourceB.textContent = sourceBText;
+        const getSourceLabel = (src) => {
+          if (src === 'fbref') return '🔵 xG FBref';
+          if (src === 'real')  return '🟢 xG Real';
+          return '⚪ Estimado';
+        };
+        xgSourceA.textContent = getSourceLabel(data.xgSourceA);
+        xgSourceB.textContent = getSourceLabel(data.xgSourceB);
     }
     
     // Mostrar correlación Dixon-Coles rho (Mejora 3)
@@ -466,6 +505,58 @@ async function runPredictionFlow() {
       `;
       scoreListContainer.appendChild(li);
     });
+
+    // --- Render new markets (Block 1) ---
+    goalsMarketsCard.classList.remove("hidden");
+    
+    bttsYes.textContent = `${(data.goalsMarkets.btts.yes * 100).toFixed(1)}%`;
+    bttsNo.textContent = `${(data.goalsMarkets.btts.no * 100).toFixed(1)}%`;
+    
+    dc1X.textContent = `${(data.goalsMarkets.doubleChance['1X'] * 100).toFixed(1)}%`;
+    dc12.textContent = `${(data.goalsMarkets.doubleChance['12'] * 100).toFixed(1)}%`;
+    dcX2.textContent = `${(data.goalsMarkets.doubleChance['X2'] * 100).toFixed(1)}%`;
+    
+    labelDnb1.textContent = `${nameAVal.slice(0, 8)}:`;
+    labelDnb2.textContent = `${nameBVal.slice(0, 8)}:`;
+    dnb1.textContent = `${(data.goalsMarkets.dnb['1'] * 100).toFixed(1)}%`;
+    dnb2.textContent = `${(data.goalsMarkets.dnb['2'] * 100).toFixed(1)}%`;
+    
+    ouGoalsTbody.innerHTML = "";
+    data.goalsMarkets.overUnder.forEach(ou => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${ou.threshold.toFixed(1)} Goles</strong></td>
+        <td style="color: var(--color-team-b); font-weight: 700;">${(ou.over * 100).toFixed(1)}%</td>
+        <td style="color: rgba(244, 63, 94, 0.8); font-weight: 700;">${(ou.under * 100).toFixed(1)}%</td>
+      `;
+      ouGoalsTbody.appendChild(tr);
+    });
+
+    // --- Render corners prediction (Block 2) ---
+    cornersPredictionCard.classList.remove("hidden");
+    
+    expectedCornersLabelA.textContent = `Córners ${nameAVal}`;
+    expectedCornersLabelB.textContent = `Córners ${nameBVal}`;
+    expectedCornersValA.textContent = data.cornersPrediction.expectedA.toFixed(1);
+    expectedCornersValB.textContent = data.cornersPrediction.expectedB.toFixed(1);
+    expectedCornersTotal.textContent = data.cornersPrediction.expectedTotal.toFixed(1);
+    
+    ouCornersTbody.innerHTML = "";
+    data.cornersPrediction.overUnder.forEach(ou => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${ou.threshold.toFixed(1)} Córners</strong></td>
+        <td style="color: var(--color-team-b); font-weight: 700;">${(ou.over * 100).toFixed(1)}%</td>
+        <td style="color: rgba(244, 63, 94, 0.8); font-weight: 700;">${(ou.under * 100).toFixed(1)}%</td>
+      `;
+      ouCornersTbody.appendChild(tr);
+    });
+    
+    labelMostCornersA.textContent = `${nameAVal.slice(0, 8)}:`;
+    labelMostCornersB.textContent = `${nameBVal.slice(0, 8)}:`;
+    probMostCornersA.textContent = `${(data.cornersPrediction.probMostA * 100).toFixed(1)}%`;
+    probMostCornersDraw.textContent = `${(data.cornersPrediction.probMostDraw * 100).toFixed(1)}%`;
+    probMostCornersB.textContent = `${(data.cornersPrediction.probMostB * 100).toFixed(1)}%`;
 
     // Render Betting analysis (+EV)
     const ba = data.bettingAnalysis;

@@ -475,15 +475,22 @@ def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_l
     # Cargar datos de xG histórico real
     xg_data = load_xg_data()
     
-    # 1. Obtener xG real si está disponible (Mejora 2)
+    # 1. Obtener xG real si está disponible
     xg_real_a_home = None
     xg_real_b_away = None
-    
+    source_a_tag = "modelo"
+    source_b_tag = "modelo"
+
     if team_a in xg_data:
-        xg_real_a_home = xg_data[team_a].get('xg_home') or xg_data[team_a].get('xg_overall')
+        entry_a = xg_data[team_a]
+        xg_real_a_home = entry_a.get('xg_home') or entry_a.get('xg_overall')
+        source_a_tag = "fbref" if entry_a.get('source') == 'fbref_world_cup' else "real"
+
     if team_b in xg_data:
-        xg_real_b_away = xg_data[team_b].get('xg_away') or xg_data[team_b].get('xg_overall')
-    
+        entry_b = xg_data[team_b]
+        xg_real_b_away = entry_b.get('xg_away') or entry_b.get('xg_overall')
+        source_b_tag = "fbref" if entry_b.get('source') == 'fbref_world_cup' else "real"
+
     # Get form stats
     gs_a, gc_a = get_team_form_stats(team_a, matches, ratings, half_life_months)
     gs_b, gc_b = get_team_form_stats(team_b, matches, ratings, half_life_months)
@@ -500,17 +507,21 @@ def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_l
     if xg_b <= 0.1:
         xg_b = max(0.3, 1.35 + (elo_b - elo_a) / 400.0)
     
-    # 3. BLEND con xG real si está disponible (60% real, 40% modelo)
+    # 3. BLEND con xG real si está disponible
+    # FBref Mundial: 70% FBref + 30% modelo (mayor confianza en datos reales)
+    # Estimado legacy: 60% estimado + 40% modelo
     xg_source_a = "modelo"
     xg_source_b = "modelo"
     
     if xg_real_a_home and xg_real_a_home > 0:
-        xg_a = 0.6 * xg_real_a_home + 0.4 * xg_a
-        xg_source_a = "real"
+        blend_w = 0.70 if source_a_tag == "fbref" else 0.60
+        xg_a = blend_w * xg_real_a_home + (1.0 - blend_w) * xg_a
+        xg_source_a = source_a_tag
     
     if xg_real_b_away and xg_real_b_away > 0:
-        xg_b = 0.6 * xg_real_b_away + 0.4 * xg_b
-        xg_source_b = "real"
+        blend_w = 0.70 if source_b_tag == "fbref" else 0.60
+        xg_b = blend_w * xg_real_b_away + (1.0 - blend_w) * xg_b
+        xg_source_b = source_b_tag
         
     # 4. FIFA Ranking adjust
     rank_diff = rank_b - rank_a # positive = A is higher ranked
@@ -620,6 +631,112 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
             "probability": float(count) / num_sims
         })
         
+    # --- CALCULATE GOALS MARKETS (BLOCK 1) ---
+    prob_btts = 0.0
+    prob_over_0_5 = 0.0
+    prob_over_1_5 = 0.0
+    prob_over_2_5 = 0.0
+    prob_over_3_5 = 0.0
+
+    for (a, b), p in joint_probs.items():
+        if a >= 1 and b >= 1:
+            prob_btts += p
+        total_goals = a + b
+        if total_goals > 0.5:
+            prob_over_0_5 += p
+        if total_goals > 1.5:
+            prob_over_1_5 += p
+        if total_goals > 2.5:
+            prob_over_2_5 += p
+        if total_goals > 3.5:
+            prob_over_3_5 += p
+
+    prob_under_0_5 = 1.0 - prob_over_0_5
+    prob_under_1_5 = 1.0 - prob_over_1_5
+    prob_under_2_5 = 1.0 - prob_over_2_5
+    prob_under_3_5 = 1.0 - prob_over_3_5
+
+    goals_markets = {
+        "btts": {
+            "yes": round(prob_btts, 4),
+            "no": round(1.0 - prob_btts, 4)
+        },
+        "doubleChance": {
+            "1X": round(win_a_prob + draw_prob, 4),
+            "12": round(win_a_prob + win_b_prob, 4),
+            "X2": round(draw_prob + win_b_prob, 4)
+        },
+        "dnb": {
+            "1": round(win_a_prob / (win_a_prob + win_b_prob) if (win_a_prob + win_b_prob) > 0 else 0.5, 4),
+            "2": round(win_b_prob / (win_a_prob + win_b_prob) if (win_a_prob + win_b_prob) > 0 else 0.5, 4)
+        },
+        "overUnder": [
+            {"threshold": 0.5, "over": round(prob_over_0_5, 4), "under": round(prob_under_0_5, 4)},
+            {"threshold": 1.5, "over": round(prob_over_1_5, 4), "under": round(prob_under_1_5, 4)},
+            {"threshold": 2.5, "over": round(prob_over_2_5, 4), "under": round(prob_under_2_5, 4)},
+            {"threshold": 3.5, "over": round(prob_over_3_5, 4), "under": round(prob_under_3_5, 4)}
+        ]
+    }
+
+    # --- CALCULATE CORNERS MODEL (BLOCK 2) ---
+    xg_data = load_xg_data()
+    entry_a = xg_data.get(team_a, {})
+    entry_b = xg_data.get(team_b, {})
+
+    sh_a = entry_a.get("shots_per_90") or 11.5
+    crs_a = entry_a.get("crosses_per_90") or 13.0
+    sh_b = entry_b.get("shots_per_90") or 11.5
+    crs_b = entry_b.get("crosses_per_90") or 13.0
+
+    # Corner Attack Multipliers (based on shots and crosses)
+    cam_a = 0.4 * (sh_a / 11.5) + 0.6 * (crs_a / 13.0)
+    cam_b = 0.4 * (sh_b / 11.5) + 0.6 * (crs_b / 13.0)
+
+    # Concession Multipliers (based on ELO difference)
+    elo_a = ratings.get(team_a, 1500)
+    elo_b = ratings.get(team_b, 1500)
+    elo_diff = elo_a - elo_b
+
+    concession_a = max(0.5, min(1.8, 10 ** (-elo_diff / 800.0)))
+    concession_b = max(0.5, min(1.8, 10 ** (elo_diff / 800.0)))
+
+    # Expected corners lambda
+    lambda_corners_a = max(1.5, min(9.5, 5.0 * cam_a * concession_b))
+    lambda_corners_b = max(1.5, min(9.5, 4.0 * cam_b * concession_a))
+
+    # Simulate Corners (Poisson distribution)
+    sim_corners_a = np.random.poisson(lambda_corners_a, num_sims)
+    sim_corners_b = np.random.poisson(lambda_corners_b, num_sims)
+    sim_corners_total = sim_corners_a + sim_corners_b
+
+    avg_corners_a = float(np.mean(sim_corners_a))
+    avg_corners_b = float(np.mean(sim_corners_b))
+    avg_corners_total = float(np.mean(sim_corners_total))
+
+    prob_most_corners_a = float(np.mean(sim_corners_a > sim_corners_b))
+    prob_most_corners_b = float(np.mean(sim_corners_b > sim_corners_a))
+    prob_most_corners_draw = float(np.mean(sim_corners_a == sim_corners_b))
+
+    prob_corners_over_7_5 = float(np.mean(sim_corners_total > 7.5))
+    prob_corners_over_8_5 = float(np.mean(sim_corners_total > 8.5))
+    prob_corners_over_9_5 = float(np.mean(sim_corners_total > 9.5))
+    prob_corners_over_10_5 = float(np.mean(sim_corners_total > 10.5))
+
+    corners_prediction = {
+        "expectedA": round(avg_corners_a, 2),
+        "expectedB": round(avg_corners_b, 2),
+        "expectedTotal": round(avg_corners_total, 2),
+        "probMostA": round(prob_most_corners_a, 4),
+        "probMostB": round(prob_most_corners_b, 4),
+        "probMostDraw": round(prob_most_corners_draw, 4),
+        "overUnder": [
+            {"threshold": 7.5, "over": round(prob_corners_over_7_5, 4), "under": round(1.0 - prob_corners_over_7_5, 4)},
+            {"threshold": 8.5, "over": round(prob_corners_over_8_5, 4), "under": round(1.0 - prob_corners_over_8_5, 4)},
+            {"threshold": 9.5, "over": round(prob_corners_over_9_5, 4), "under": round(1.0 - prob_corners_over_9_5, 4)},
+            {"threshold": 10.5, "over": round(prob_corners_over_10_5, 4), "under": round(1.0 - prob_corners_over_10_5, 4)}
+        ]
+    }
+        
     # Betting Edge (+EV) calculations
     betting_analysis = {
         "hasOdds": False,
@@ -656,6 +773,8 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
         "probDraw": sim_pct_draw,
         "probWinB": sim_pct_b,
         "topScores": top_scores,
+        "goalsMarkets": goals_markets,
+        "cornersPrediction": corners_prediction,
         "bettingAnalysis": betting_analysis,
         "dcRho": DC_RHO
     }

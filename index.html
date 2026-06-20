@@ -245,6 +245,93 @@
           </ol>
         </div>
 
+        <!-- Nuevos Mercados de Goles -->
+        <div class="goals-markets-section glass-card hidden" id="goals-markets-card">
+          <h3>Otros Mercados de Goles</h3>
+          <div class="markets-grid">
+            <div class="market-box">
+              <h4>Ambos Equipos Anotan (BTTS)</h4>
+              <div class="market-odds-row">
+                <div><span>Sí: </span><strong id="market-btts-yes">--</strong></div>
+                <div><span>No: </span><strong id="market-btts-no">--</strong></div>
+              </div>
+            </div>
+            <div class="market-box">
+              <h4>Doble Oportunidad</h4>
+              <div class="market-odds-row">
+                <div><span>1X: </span><strong id="market-dc-1X">--</strong></div>
+                <div><span>12: </span><strong id="market-dc-12">--</strong></div>
+                <div><span>X2: </span><strong id="market-dc-X2">--</strong></div>
+              </div>
+            </div>
+            <div class="market-box">
+              <h4>Empate No Válido (DNB)</h4>
+              <div class="market-odds-row">
+                <div><span id="label-dnb-1">DNB 1: </span><strong id="market-dnb-1">--</strong></div>
+                <div><span id="label-dnb-2">DNB 2: </span><strong id="market-dnb-2">--</strong></div>
+              </div>
+            </div>
+          </div>
+          
+          <h4 style="margin-top: 15px; margin-bottom: 8px;">Líneas de Over/Under Goles</h4>
+          <div class="ou-table-container">
+            <table class="ou-table">
+              <thead>
+                <tr>
+                  <th>Línea</th>
+                  <th>Over (%)</th>
+                  <th>Under (%)</th>
+                </tr>
+              </thead>
+              <tbody id="ou-goals-tbody">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Predicción de Córners -->
+        <div class="corners-prediction-section glass-card hidden" id="corners-prediction-card">
+          <h3>Predicción de Córners (🚩)</h3>
+          <div class="corners-expected-row">
+            <div class="expected-corners-box">
+              <span id="expected-corners-label-a">Córners Uruguay</span>
+              <strong id="expected-corners-val-a">--</strong>
+            </div>
+            <div class="expected-corners-divider">
+              <span>Total Esperado</span>
+              <strong id="expected-corners-total">--</strong>
+            </div>
+            <div class="expected-corners-box">
+              <span id="expected-corners-label-b">Córners Arabia Saudita</span>
+              <strong id="expected-corners-val-b">--</strong>
+            </div>
+          </div>
+
+          <h4 style="margin-top: 15px; margin-bottom: 8px;">Líneas de Over/Under Córners</h4>
+          <div class="ou-table-container">
+            <table class="ou-table">
+              <thead>
+                <tr>
+                  <th>Línea</th>
+                  <th>Over (%)</th>
+                  <th>Under (%)</th>
+                </tr>
+              </thead>
+              <tbody id="ou-corners-tbody">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+          
+          <h4 style="margin-top: 15px; margin-bottom: 8px;">Más Córners (1X2)</h4>
+          <div class="market-odds-row">
+            <div><span id="label-most-corners-a">Uruguay: </span><strong id="prob-most-corners-a">--</strong></div>
+            <div><span>Empate: </span><strong id="prob-most-corners-draw">--</strong></div>
+            <div><span id="label-most-corners-b">Arabia Saudita: </span><strong id="prob-most-corners-b">--</strong></div>
+          </div>
+        </div>
+
         <!-- Betting Value (+EV) Analysis Section -->
         <div class="betting-edge-section glass-card" id="betting-edge-card">
           <h3>Análisis de Valor de Apuestas (+EV)</h3>
