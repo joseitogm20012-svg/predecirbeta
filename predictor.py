@@ -4,6 +4,7 @@ import os
 import csv
 import numpy as np
 from datetime import datetime
+from functools import lru_cache
 
 # Load base path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -196,6 +197,7 @@ def name_to_slug(name):
 _cached_matches = None
 _cached_ratings = None
 
+@lru_cache(maxsize=1)
 def load_data():
     global _cached_matches, _cached_ratings
     if _cached_matches is not None and _cached_ratings is not None:
@@ -471,25 +473,46 @@ def estimate_rho_from_data(matches, ratings, sample_size=2000):
     return round(rho_final, 4)
 
 
-def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings):
-    # Cargar datos de xG histórico real
-    xg_data = load_xg_data()
+def get_team_real_xg(team_slug, xg_data):
+    """
+    Obtiene el xG real de un equipo y su etiqueta de fuente desde xg_data.
+    Responsabilidad única: Lectura y mapeo de datos reales.
+    """
+    if not xg_data or team_slug not in xg_data:
+        return None, "modelo"
+    entry = xg_data[team_slug]
+    xg_real = entry.get('xg_home') or entry.get('xg_overall')
+    source_tag = "fbref" if entry.get('source') == 'fbref_world_cup' else "real"
+    return xg_real, source_tag
+
+def get_team_corner_stats(team_slug, xg_data, avg_gs):
+    """
+    Obtiene estadísticas para el modelo de corners (disparos y centros).
+    Si no hay datos en xg_data (p. ej. debutantes mundialistas), estima
+    los valores dinámicamente según la forma ofensiva real del equipo.
+    """
+    entry = xg_data.get(team_slug, {}) if xg_data else {}
     
-    # 1. Obtener xG real si está disponible
-    xg_real_a_home = None
-    xg_real_b_away = None
-    source_a_tag = "modelo"
-    source_b_tag = "modelo"
+    if entry:
+        sh = entry.get("shots_per_90") or 11.5
+        crs = entry.get("crosses_per_90") or 13.0
+        sh_blocked = entry.get("shots_blocked_per_90", 0)
+        sh_off = entry.get("shots_off_target_per_90", 0)
+        return sh, crs, sh_blocked, sh_off
+        
+    # Estimación basada en promedio de goles marcados (form factor)
+    # Promedio global de goles es ~1.35
+    form_factor = max(0.5, min(1.8, avg_gs / 1.35))
+    sh = 11.5 * form_factor
+    crs = 13.0 * form_factor
+    sh_blocked = 1.5 * form_factor
+    sh_off = 4.0 * form_factor
+    return sh, crs, sh_blocked, sh_off
 
-    if team_a in xg_data:
-        entry_a = xg_data[team_a]
-        xg_real_a_home = entry_a.get('xg_home') or entry_a.get('xg_overall')
-        source_a_tag = "fbref" if entry_a.get('source') == 'fbref_world_cup' else "real"
-
-    if team_b in xg_data:
-        entry_b = xg_data[team_b]
-        xg_real_b_away = entry_b.get('xg_away') or entry_b.get('xg_overall')
-        source_b_tag = "fbref" if entry_b.get('source') == 'fbref_world_cup' else "real"
+def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings, xg_data):
+    # 1. Obtener xG real si está disponible usando la función desacoplada
+    xg_real_a_home, source_a_tag = get_team_real_xg(team_a, xg_data)
+    xg_real_b_away, source_b_tag = get_team_real_xg(team_b, xg_data)
 
     # Get form stats
     gs_a, gc_a = get_team_form_stats(team_a, matches, ratings, half_life_months)
@@ -656,6 +679,12 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
     prob_under_2_5 = 1.0 - prob_over_2_5
     prob_under_3_5 = 1.0 - prob_over_3_5
 
+    # Asian Handicaps (Team A perspective)
+    prob_ah_minus_1_5_a = sum(p for (a, b), p in joint_probs.items() if a - b >= 2)
+    prob_ah_minus_0_5_a = win_a_prob
+    prob_ah_plus_0_5_a = win_a_prob + draw_prob
+    prob_ah_plus_1_5_a = 1.0 - sum(p for (a, b), p in joint_probs.items() if b - a >= 2)
+
     goals_markets = {
         "btts": {
             "yes": round(prob_btts, 4),
@@ -675,7 +704,13 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
             {"threshold": 1.5, "over": round(prob_over_1_5, 4), "under": round(prob_under_1_5, 4)},
             {"threshold": 2.5, "over": round(prob_over_2_5, 4), "under": round(prob_under_2_5, 4)},
             {"threshold": 3.5, "over": round(prob_over_3_5, 4), "under": round(prob_under_3_5, 4)}
-        ]
+        ],
+        "asianHandicap": {
+            "-1.5": {"teamA": round(prob_ah_minus_1_5_a, 4), "teamB": round(1.0 - prob_ah_minus_1_5_a, 4)},
+            "-0.5": {"teamA": round(prob_ah_minus_0_5_a, 4), "teamB": round(1.0 - prob_ah_minus_0_5_a, 4)},
+            "+0.5": {"teamA": round(prob_ah_plus_0_5_a, 4), "teamB": round(1.0 - prob_ah_plus_0_5_a, 4)},
+            "+1.5": {"teamA": round(prob_ah_plus_1_5_a, 4), "teamB": round(1.0 - prob_ah_plus_1_5_a, 4)}
+        }
     }
 
     # --- CALCULATE CORNERS MODEL (BLOCK 2) ---
@@ -685,12 +720,24 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
 
     sh_a = entry_a.get("shots_per_90") or 11.5
     crs_a = entry_a.get("crosses_per_90") or 13.0
+    sh_blocked_a = entry_a.get("shots_blocked_per_90", 0)
+    sh_off_a = entry_a.get("shots_off_target_per_90", 0)
+    
     sh_b = entry_b.get("shots_per_90") or 11.5
     crs_b = entry_b.get("crosses_per_90") or 13.0
+    sh_blocked_b = entry_b.get("shots_blocked_per_90", 0)
+    sh_off_b = entry_b.get("shots_off_target_per_90", 0)
 
-    # Corner Attack Multipliers (based on shots and crosses)
-    cam_a = 0.4 * (sh_a / 11.5) + 0.6 * (crs_a / 13.0)
-    cam_b = 0.4 * (sh_b / 11.5) + 0.6 * (crs_b / 13.0)
+    # Corner Attack Multipliers (based on shots, blocked/off-target, and crosses)
+    if sh_blocked_a + sh_off_a > 0:
+        cam_a = 0.3 * (sh_a / 11.5) + 0.3 * ((sh_blocked_a + sh_off_a) / 5.0) + 0.4 * (crs_a / 13.0)
+    else:
+        cam_a = 0.4 * (sh_a / 11.5) + 0.6 * (crs_a / 13.0)
+        
+    if sh_blocked_b + sh_off_b > 0:
+        cam_b = 0.3 * (sh_b / 11.5) + 0.3 * ((sh_blocked_b + sh_off_b) / 5.0) + 0.4 * (crs_b / 13.0)
+    else:
+        cam_b = 0.4 * (sh_b / 11.5) + 0.6 * (crs_b / 13.0)
 
     # Concession Multipliers (based on ELO difference)
     elo_a = ratings.get(team_a, 1500)

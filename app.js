@@ -72,6 +72,8 @@ const TEAM_METADATA = {
 let ratingsData = {};
 let selectedTeamA = "uruguay";
 let selectedTeamB = "saudi-arabia";
+let goalsChart = null;
+let outcomeChart = null;
 
 // DOM Elements
 const selectA = document.getElementById("select-team-a");
@@ -147,6 +149,9 @@ const dnb2 = document.getElementById("market-dnb-2");
 const labelDnb1 = document.getElementById("label-dnb-1");
 const labelDnb2 = document.getElementById("label-dnb-2");
 const ouGoalsTbody = document.getElementById("ou-goals-tbody");
+const ahTbody = document.getElementById("ah-tbody");
+const thAhA = document.getElementById("th-ah-a");
+const thAhB = document.getElementById("th-ah-b");
 
 const expectedCornersValA = document.getElementById("expected-corners-val-a");
 const expectedCornersValB = document.getElementById("expected-corners-val-b");
@@ -163,8 +168,24 @@ const labelMostCornersB = document.getElementById("label-most-corners-b");
 // Tabs Elements
 const tabHistoryBtn = document.getElementById("tab-btn-history");
 const tabH2hBtn = document.getElementById("tab-btn-h2h");
+const tabBacktestBtn = document.getElementById("tab-btn-backtest");
 const tabHistoryContent = document.getElementById("tab-history");
 const tabH2hContent = document.getElementById("tab-h2h");
+const tabBacktestContent = document.getElementById("tab-backtest");
+
+// Backtest Elements
+const btnRunBacktest = document.getElementById("btn-run-backtest");
+const backtestSpinner = document.getElementById("backtest-spinner");
+const backtestResultsContainer = document.getElementById("backtest-results-container");
+const btRoi = document.getElementById("bt-roi");
+const btProfit = document.getElementById("bt-profit");
+const btBets = document.getElementById("bt-bets");
+const btHitrate = document.getElementById("bt-hitrate");
+const btFavAcc = document.getElementById("bt-fav-acc");
+const btBrier = document.getElementById("bt-brier");
+const btLogloss = document.getElementById("bt-logloss");
+const btMatches = document.getElementById("bt-matches");
+const btDate = document.getElementById("bt-date");
 
 const matchListA = document.getElementById("match-list-a");
 const matchListB = document.getElementById("match-list-b");
@@ -194,11 +215,36 @@ async function initializeApp() {
     // 2. Populate selectors
     populateSelects();
 
+    // Initialize TomSelect for searchable dropdowns
+    try {
+      if (typeof TomSelect !== 'undefined') {
+        new TomSelect("#select-team-a", {
+          create: false,
+          sortField: { field: "text", direction: "asc" }
+        });
+        
+        new TomSelect("#select-team-b", {
+          create: false,
+          sortField: { field: "text", direction: "asc" }
+        });
+      } else {
+        console.warn("TomSelect no está definido. Cargando selectores normales.");
+      }
+    } catch (e) {
+      console.error("Error inicializando TomSelect:", e);
+    }
+
     // 3. Bind UI listeners
     bindListeners();
 
-    // 4. Update UI for the initial match
+    // 4. Load backtest metrics
+    loadBacktestMetrics();
+
+    // 5. Update UI for the initial match
     updateMatchCard();
+
+    // 6. Run initial simulation
+    runPredictionFlow();
 
   } catch (error) {
     console.error("Initialization error:", error);
@@ -235,12 +281,14 @@ function bindListeners() {
     selectedTeamA = e.target.value;
     rankSliderA.value = TEAM_METADATA[selectedTeamA].rank;
     updateMatchCard();
+    runPredictionFlow();
   });
 
   selectB.addEventListener("change", (e) => {
     selectedTeamB = e.target.value;
     rankSliderB.value = TEAM_METADATA[selectedTeamB].rank;
     updateMatchCard();
+    runPredictionFlow();
   });
 
   rankSliderA.addEventListener("input", (e) => {
@@ -263,15 +311,32 @@ function bindListeners() {
   tabHistoryBtn.addEventListener("click", () => {
     tabHistoryBtn.classList.add("active");
     tabH2hBtn.classList.remove("active");
+    tabBacktestBtn.classList.remove("active");
     tabHistoryContent.classList.remove("hidden");
     tabH2hContent.classList.add("hidden");
+    tabBacktestContent.classList.add("hidden");
   });
 
   tabH2hBtn.addEventListener("click", () => {
     tabH2hBtn.classList.add("active");
     tabHistoryBtn.classList.remove("active");
+    tabBacktestBtn.classList.remove("active");
     tabH2hContent.classList.remove("hidden");
     tabHistoryContent.classList.add("hidden");
+    tabBacktestContent.classList.add("hidden");
+  });
+
+  tabBacktestBtn.addEventListener("click", () => {
+    tabBacktestBtn.classList.add("active");
+    tabHistoryBtn.classList.remove("active");
+    tabH2hBtn.classList.remove("active");
+    tabBacktestContent.classList.remove("hidden");
+    tabHistoryContent.classList.add("hidden");
+    tabH2hContent.classList.add("hidden");
+  });
+
+  btnRunBacktest.addEventListener("click", () => {
+    runBacktestFlow();
   });
 }
 
@@ -330,7 +395,8 @@ async function loadRecentMatches(teamSlug, listElement, titleElement, defaultNam
       return;
     }
 
-    data.history.forEach(m => {
+    // Mostrar primeros 8 partidos y ocultar el resto tras un botón
+    data.history.forEach((m, index) => {
       const goalsScored = m.goalsScored;
       const goalsConceded = m.goalsConceded;
       
@@ -346,8 +412,9 @@ async function loadRecentMatches(teamSlug, listElement, titleElement, defaultNam
         badgeHtml = `<span class="difficulty-badge" style="${style}">${m.opponentLevel}</span>`;
       }
 
+      const isHiddenClass = index >= 8 ? "hidden-match" : "";
       const card = document.createElement("div");
-      card.className = `match-card ${outcomeClass}`;
+      card.className = `match-card ${outcomeClass} ${isHiddenClass}`;
       card.style.opacity = Math.max(0.35, m.weight).toFixed(2);
 
       card.innerHTML = `
@@ -358,6 +425,18 @@ async function loadRecentMatches(teamSlug, listElement, titleElement, defaultNam
 
       listElement.appendChild(card);
     });
+
+    if (data.history.length > 8) {
+      const btnMore = document.createElement("button");
+      btnMore.className = "btn-view-more";
+      btnMore.textContent = `Ver los ${data.history.length - 8} partidos anteriores`;
+      btnMore.onclick = () => {
+        const hiddenMatches = listElement.querySelectorAll('.hidden-match');
+        hiddenMatches.forEach(el => el.classList.remove('hidden-match'));
+        btnMore.remove();
+      };
+      listElement.appendChild(btnMore);
+    }
 
   } catch (error) {
     console.error("Error loading recent matches:", error);
@@ -419,6 +498,167 @@ async function loadH2HData() {
   } catch (error) {
     console.error("Error loading H2H data:", error);
     h2hMatchList.innerHTML = `<div class="loading-placeholder">Error al cargar H2H de la API.</div>`;
+  }
+}
+
+function poissonProbability(k, lambda) {
+  if (lambda <= 0) return k === 0 ? 1.0 : 0.0;
+  let factorial = 1;
+  for (let i = 2; i <= k; i++) {
+    factorial *= i;
+  }
+  return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial;
+}
+
+function getPoissonDistribution(lambda) {
+  const dist = [];
+  let sum = 0;
+  for (let k = 0; k < 5; k++) {
+    const p = poissonProbability(k, lambda);
+    dist.push(p);
+    sum += p;
+  }
+  dist.push(Math.max(0, 1.0 - sum));
+  return dist;
+}
+
+function updateCharts(nameAVal, nameBVal, xgAVal, xgBVal, winA, draw, winB) {
+  const distA = getPoissonDistribution(xgAVal);
+  const distB = getPoissonDistribution(xgBVal);
+
+  if (goalsChart) {
+    goalsChart.data.datasets[0].label = nameAVal;
+    goalsChart.data.datasets[0].data = distA;
+    goalsChart.data.datasets[1].label = nameBVal;
+    goalsChart.data.datasets[1].data = distB;
+    goalsChart.update();
+  } else {
+    const ctx = document.getElementById('goalsDistributionChart');
+    if (ctx) {
+      goalsChart = new Chart(ctx.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: ['0', '1', '2', '3', '4', '5+'],
+          datasets: [
+            {
+              label: nameAVal,
+              data: distA,
+              backgroundColor: 'rgba(59, 130, 246, 0.65)',
+              borderColor: 'rgba(59, 130, 246, 1)',
+              borderWidth: 1.5,
+              borderRadius: 4
+            },
+            {
+              label: nameBVal,
+              data: distB,
+              backgroundColor: 'rgba(16, 185, 129, 0.65)',
+              borderColor: 'rgba(16, 185, 129, 1)',
+              borderWidth: 1.5,
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: {
+                color: '#fff',
+                boxWidth: 12,
+                padding: 10,
+                font: { family: 'Inter', size: 10 }
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 22, 42, 0.9)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              borderWidth: 1,
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.dataset.label}: ${(context.raw * 100).toFixed(1)}%`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 } }
+            },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: {
+                color: '#9ca3af',
+                font: { family: 'Inter', size: 10 },
+                callback: function(value) { return (value * 100).toFixed(0) + '%'; }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  if (outcomeChart) {
+    outcomeChart.data.labels = [`Victoria ${nameAVal}`, 'Empate', `Victoria ${nameBVal}`];
+    outcomeChart.data.datasets[0].data = [winA, draw, winB];
+    outcomeChart.update();
+  } else {
+    const ctx = document.getElementById('outcomeDonutChart');
+    if (ctx) {
+      outcomeChart = new Chart(ctx.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: [`Victoria ${nameAVal}`, 'Empate', `Victoria ${nameBVal}`],
+          datasets: [{
+            data: [winA, draw, winB],
+            backgroundColor: [
+              'rgba(59, 130, 246, 0.75)',
+              'rgba(107, 114, 128, 0.75)',
+              'rgba(16, 185, 129, 0.75)'
+            ],
+            borderColor: [
+              'rgba(59, 130, 246, 1)',
+              'rgba(107, 114, 128, 1)',
+              'rgba(16, 185, 129, 1)'
+            ],
+            borderWidth: 1.5,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: '#fff',
+                boxWidth: 12,
+                padding: 8,
+                font: { family: 'Inter', size: 10 }
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 22, 42, 0.9)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              borderWidth: 1,
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.label}: ${(context.raw * 100).toFixed(1)}%`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
   }
 }
 
@@ -511,26 +751,73 @@ async function runPredictionFlow() {
     
     bttsYes.textContent = `${(data.goalsMarkets.btts.yes * 100).toFixed(1)}%`;
     bttsNo.textContent = `${(data.goalsMarkets.btts.no * 100).toFixed(1)}%`;
+    document.getElementById('in-btts-yes').dataset.prob = data.goalsMarkets.btts.yes;
+    document.getElementById('in-btts-no').dataset.prob = data.goalsMarkets.btts.no;
     
     dc1X.textContent = `${(data.goalsMarkets.doubleChance['1X'] * 100).toFixed(1)}%`;
     dc12.textContent = `${(data.goalsMarkets.doubleChance['12'] * 100).toFixed(1)}%`;
     dcX2.textContent = `${(data.goalsMarkets.doubleChance['X2'] * 100).toFixed(1)}%`;
+    document.getElementById('in-dc-1X').dataset.prob = data.goalsMarkets.doubleChance['1X'];
+    document.getElementById('in-dc-12').dataset.prob = data.goalsMarkets.doubleChance['12'];
+    document.getElementById('in-dc-X2').dataset.prob = data.goalsMarkets.doubleChance['X2'];
     
     labelDnb1.textContent = `${nameAVal.slice(0, 8)}:`;
     labelDnb2.textContent = `${nameBVal.slice(0, 8)}:`;
     dnb1.textContent = `${(data.goalsMarkets.dnb['1'] * 100).toFixed(1)}%`;
     dnb2.textContent = `${(data.goalsMarkets.dnb['2'] * 100).toFixed(1)}%`;
+    document.getElementById('in-dnb-1').dataset.prob = data.goalsMarkets.dnb['1'];
+    document.getElementById('in-dnb-2').dataset.prob = data.goalsMarkets.dnb['2'];
     
     ouGoalsTbody.innerHTML = "";
     data.goalsMarkets.overUnder.forEach(ou => {
+      const tStr = ou.threshold.toString().replace('.', '');
+      
+      const idOver = `in-ou-goles-${tStr}-over`;
+      const idUnder = `in-ou-goles-${tStr}-under`;
+      
+      const inO = document.getElementById(idOver);
+      const inU = document.getElementById(idUnder);
+      
+      if (inO) inO.dataset.prob = ou.over;
+      if (inU) inU.dataset.prob = ou.under;
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><strong>${ou.threshold.toFixed(1)} Goles</strong></td>
-        <td style="color: var(--color-team-b); font-weight: 700;">${(ou.over * 100).toFixed(1)}%</td>
-        <td style="color: rgba(244, 63, 94, 0.8); font-weight: 700;">${(ou.under * 100).toFixed(1)}%</td>
+        <td style="color: var(--color-team-b); font-weight: 700;">${(ou.over * 100).toFixed(1)}% <span id="ev-ou-goles-${tStr}-over" class="ev-mini"></span></td>
+        <td style="color: rgba(244, 63, 94, 0.8); font-weight: 700;">${(ou.under * 100).toFixed(1)}% <span id="ev-ou-goles-${tStr}-under" class="ev-mini"></span></td>
       `;
       ouGoalsTbody.appendChild(tr);
     });
+
+    if (data.goalsMarkets.asianHandicap) {
+      thAhA.textContent = `${nameAVal.slice(0, 10)} (%)`;
+      thAhB.textContent = `${nameBVal.slice(0, 10)} (%)`;
+      ahTbody.innerHTML = "";
+      
+      const ahLines = ["-1.5", "-0.5", "+0.5", "+1.5"];
+      ahLines.forEach(line => {
+        const ahData = data.goalsMarkets.asianHandicap[line];
+        const tStr = line.replace('-', 'm').replace('+', 'p').replace('.', '');
+        
+        const idA = `in-ah-${tStr}-a`;
+        const idB = `in-ah-${tStr}-b`;
+        
+        const inA = document.getElementById(idA);
+        const inB = document.getElementById(idB);
+        
+        if (inA) inA.dataset.prob = ahData.teamA;
+        if (inB) inB.dataset.prob = ahData.teamB;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>AH ${line}</strong></td>
+          <td style="color: var(--color-team-a); font-weight: 700;">${(ahData.teamA * 100).toFixed(1)}% <span id="ev-ah-${tStr}-a" class="ev-mini"></span></td>
+          <td style="color: var(--color-team-b); font-weight: 700;">${(ahData.teamB * 100).toFixed(1)}% <span id="ev-ah-${tStr}-b" class="ev-mini"></span></td>
+        `;
+        ahTbody.appendChild(tr);
+      });
+    }
 
     // --- Render corners prediction (Block 2) ---
     cornersPredictionCard.classList.remove("hidden");
@@ -543,11 +830,22 @@ async function runPredictionFlow() {
     
     ouCornersTbody.innerHTML = "";
     data.cornersPrediction.overUnder.forEach(ou => {
+      const tStr = ou.threshold.toString().replace('.', '');
+      
+      const idOver = `in-ou-corn-${tStr}-over`;
+      const idUnder = `in-ou-corn-${tStr}-under`;
+      
+      const inO = document.getElementById(idOver);
+      const inU = document.getElementById(idUnder);
+      
+      if (inO) inO.dataset.prob = ou.over;
+      if (inU) inU.dataset.prob = ou.under;
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><strong>${ou.threshold.toFixed(1)} Córners</strong></td>
-        <td style="color: var(--color-team-b); font-weight: 700;">${(ou.over * 100).toFixed(1)}%</td>
-        <td style="color: rgba(244, 63, 94, 0.8); font-weight: 700;">${(ou.under * 100).toFixed(1)}%</td>
+        <td style="color: var(--color-team-b); font-weight: 700;">${(ou.over * 100).toFixed(1)}% <span id="ev-ou-corn-${tStr}-over" class="ev-mini"></span></td>
+        <td style="color: rgba(244, 63, 94, 0.8); font-weight: 700;">${(ou.under * 100).toFixed(1)}% <span id="ev-ou-corn-${tStr}-under" class="ev-mini"></span></td>
       `;
       ouCornersTbody.appendChild(tr);
     });
@@ -557,6 +855,9 @@ async function runPredictionFlow() {
     probMostCornersA.textContent = `${(data.cornersPrediction.probMostA * 100).toFixed(1)}%`;
     probMostCornersDraw.textContent = `${(data.cornersPrediction.probMostDraw * 100).toFixed(1)}%`;
     probMostCornersB.textContent = `${(data.cornersPrediction.probMostB * 100).toFixed(1)}%`;
+    document.getElementById('in-most-corners-a').dataset.prob = data.cornersPrediction.probMostA;
+    document.getElementById('in-most-corners-draw').dataset.prob = data.cornersPrediction.probMostDraw;
+    document.getElementById('in-most-corners-b').dataset.prob = data.cornersPrediction.probMostB;
 
     // Render Betting analysis (+EV)
     const ba = data.bettingAnalysis;
@@ -613,6 +914,9 @@ async function runPredictionFlow() {
       oddsAnalysisContainer.classList.add("hidden");
     }
 
+    // Update analytical charts
+    updateCharts(nameAVal, nameBVal, data.xgA, data.xgB, data.probWinA, data.probDraw, data.probWinB);
+
   } catch (error) {
     console.error("Prediction API error:", error);
   } finally {
@@ -623,5 +927,105 @@ async function runPredictionFlow() {
   }
 }
 
+async function loadBacktestMetrics() {
+  try {
+    const res = await fetch("/api/backtest-metrics");
+    const json = await res.json();
+    if (json.status === "ok") {
+      renderBacktestMetrics(json.data);
+    }
+  } catch (error) {
+    console.error("Error loading backtest metrics:", error);
+  }
+}
+
+async function runBacktestFlow() {
+  btnRunBacktest.disabled = true;
+  backtestSpinner.classList.remove("hidden");
+  btnRunBacktest.querySelector(".btn-text").textContent = "EJECUTANDO SCRIPT (Espera ~5s)...";
+
+  try {
+    const res = await fetch("/api/run-backtest", { method: "POST" });
+    const json = await res.json();
+    
+    if (json.status === "success") {
+      renderBacktestMetrics(json.data);
+    } else {
+      alert("Error ejecutando el backtest: " + (json.detail || "Error desconocido"));
+    }
+  } catch (error) {
+    console.error("Error trigger backtest:", error);
+    alert("Error de red ejecutando backtest.");
+  } finally {
+    btnRunBacktest.disabled = false;
+    backtestSpinner.classList.add("hidden");
+    btnRunBacktest.querySelector(".btn-text").textContent = "🚀 EJECUTAR BACKTEST (Tarda ~5s)";
+  }
+}
+
+function renderBacktestMetrics(data) {
+  backtestResultsContainer.classList.remove("hidden");
+  
+  if (data.financials) {
+    btRoi.textContent = `${data.financials.roiPercent > 0 ? '+' : ''}${data.financials.roiPercent}%`;
+    btRoi.style.color = data.financials.roiPercent >= 0 ? '#10B981' : '#EF4444';
+    
+    btProfit.textContent = `${data.financials.profitUnits > 0 ? '+' : ''}${data.financials.profitUnits}`;
+    btProfit.style.color = data.financials.profitUnits >= 0 ? '#10B981' : '#EF4444';
+    
+    btBets.textContent = data.financials.betsPlaced.toLocaleString();
+    
+    if (data.financials.betsPlaced > 0) {
+      btHitrate.textContent = `${((data.financials.betsWon / data.financials.betsPlaced) * 100).toFixed(1)}%`;
+    } else {
+      btHitrate.textContent = "--%";
+    }
+  }
+  
+  if (data.model) {
+    btFavAcc.textContent = `${(data.model.favouriteAccuracy * 100).toFixed(1)}%`;
+    btBrier.textContent = data.model.brier.toFixed(3);
+    btLogloss.textContent = data.model.logloss.toFixed(3);
+  }
+  
+  btMatches.textContent = data.evaluated.toLocaleString();
+  
+  const d = new Date(data.generatedAt);
+  btDate.textContent = d.toLocaleString();
+}
+
+
+
 // Start the app on load
 document.addEventListener("DOMContentLoaded", initializeApp);
+
+// Dynamic EV calculation for market odds inputs in the left panel
+document.addEventListener('input', function(e) {
+  if (e.target && e.target.classList.contains('dyn-odds')) {
+    const prob = parseFloat(e.target.dataset.prob);
+    const odds = parseFloat(e.target.value);
+    
+    // Buscar el span de destino usando el atributo data-target
+    const targetId = e.target.dataset.target;
+    if (!targetId) return;
+    
+    const evSpan = document.getElementById(targetId);
+    
+    if (evSpan) {
+      if (!isNaN(prob) && !isNaN(odds) && odds > 1.0) {
+        const ev = (prob * odds) - 1;
+        const evPct = (ev * 100).toFixed(1);
+        if (ev > 0) {
+          evSpan.textContent = `+${evPct}% EV`;
+          evSpan.className = 'ev-mini ev-pos';
+        } else {
+          evSpan.textContent = `${evPct}% EV`;
+          evSpan.className = 'ev-mini ev-neg';
+        }
+      } else {
+        evSpan.textContent = '';
+        evSpan.className = 'ev-mini';
+      }
+    }
+  }
+});

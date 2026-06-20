@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import os
+import json
+import subprocess
 
 from predictor import load_data, run_prediction_sim, get_team_history, get_h2h_stats
 
@@ -82,6 +84,38 @@ def get_h2h(team_a: str, team_b: str):
         return h2h
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading H2H stats: {str(e)}")
+
+@app.get("/api/backtest-metrics")
+def get_backtest_metrics():
+    try:
+        backtest_path = os.path.join(BASE_DIR, "data", "model-backtest.json")
+        if not os.path.exists(backtest_path):
+            return {"status": "none", "message": "No hay backtest generado."}
+        with open(backtest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {"status": "ok", "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading backtest data: {str(e)}")
+
+@app.post("/api/run-backtest")
+def run_backtest_command():
+    try:
+        # Run the node script synchronously
+        result = subprocess.run(["node", "backtest.mjs"], cwd=BASE_DIR, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(f"Backtest failed: {result.stderr}")
+            
+        # Read the newly generated JSON
+        backtest_path = os.path.join(BASE_DIR, "data", "model-backtest.json")
+        if not os.path.exists(backtest_path):
+            raise Exception("Backtest completed but JSON output not found.")
+            
+        with open(backtest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        return {"status": "success", "data": data, "logs": result.stdout}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Mount static files (HTML, CSS, JS) at the end, so it doesn't mask API routes
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

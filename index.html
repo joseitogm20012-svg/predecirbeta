@@ -17,6 +17,13 @@
   
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="index.css">
+  
+  <!-- Tom Select for searchable dropdowns -->
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+  
+  <!-- Chart.js for analytical visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   
@@ -116,6 +123,92 @@
             <div class="odds-input-group">
               <label id="odds-label-b">Victoria B</label>
               <input type="number" id="input-odds-b" step="0.01" min="1.01" class="odds-input-field" placeholder="4.50">
+            </div>
+          </div>
+
+          <!-- Otros Mercados -->
+          <div class="form-group" style="margin-top: 15px;">
+            <label>Ambos Anotan (BTTS)</label>
+            <div class="odds-inputs-grid" style="grid-template-columns: 1fr 1fr;">
+              <input type="number" id="in-btts-yes" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-btts-yes" placeholder="Sí">
+              <input type="number" id="in-btts-no" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-btts-no" placeholder="No">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label>Doble Oportunidad</label>
+            <div class="odds-inputs-grid">
+              <input type="number" id="in-dc-1X" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-dc-1X" placeholder="1X">
+              <input type="number" id="in-dc-12" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-dc-12" placeholder="12">
+              <input type="number" id="in-dc-X2" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-dc-X2" placeholder="X2">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label>Empate No Válido (DNB)</label>
+            <div class="odds-inputs-grid" style="grid-template-columns: 1fr 1fr;">
+              <input type="number" id="in-dnb-1" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-dnb-1" placeholder="Eq. A">
+              <input type="number" id="in-dnb-2" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-dnb-2" placeholder="Eq. B">
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-top: 10px;">
+            <label>Más Córners (1X2)</label>
+            <div class="odds-inputs-grid">
+              <input type="number" id="in-most-corners-a" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-most-corners-a" placeholder="1">
+              <input type="number" id="in-most-corners-draw" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-most-corners-draw" placeholder="X">
+              <input type="number" id="in-most-corners-b" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-most-corners-b" placeholder="2">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label>Over/Under Goles (0.5 - 3.5)</label>
+            <div class="odds-inputs-grid" style="grid-template-columns: 1fr 1fr;">
+              <input type="number" id="in-ou-goles-05-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-05-over" placeholder="Over 0.5">
+              <input type="number" id="in-ou-goles-05-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-05-under" placeholder="Under 0.5">
+              
+              <input type="number" id="in-ou-goles-15-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-15-over" placeholder="Over 1.5">
+              <input type="number" id="in-ou-goles-15-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-15-under" placeholder="Under 1.5">
+              
+              <input type="number" id="in-ou-goles-25-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-25-over" placeholder="Over 2.5">
+              <input type="number" id="in-ou-goles-25-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-25-under" placeholder="Under 2.5">
+              
+              <input type="number" id="in-ou-goles-35-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-35-over" placeholder="Over 3.5">
+              <input type="number" id="in-ou-goles-35-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-goles-35-under" placeholder="Under 3.5">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label>Hándicap Asiático (AH)</label>
+            <div class="odds-inputs-grid" style="grid-template-columns: 1fr 1fr;">
+              <input type="number" id="in-ah-m15-a" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-m15-a" placeholder="A -1.5">
+              <input type="number" id="in-ah-m15-b" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-m15-b" placeholder="B +1.5">
+              
+              <input type="number" id="in-ah-m05-a" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-m05-a" placeholder="A -0.5">
+              <input type="number" id="in-ah-m05-b" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-m05-b" placeholder="B +0.5">
+              
+              <input type="number" id="in-ah-p05-a" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-p05-a" placeholder="A +0.5">
+              <input type="number" id="in-ah-p05-b" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-p05-b" placeholder="B -0.5">
+              
+              <input type="number" id="in-ah-p15-a" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-p15-a" placeholder="A +1.5">
+              <input type="number" id="in-ah-p15-b" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ah-p15-b" placeholder="B -1.5">
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-top: 10px;">
+            <label>Over/Under Córners</label>
+            <div class="odds-inputs-grid" style="grid-template-columns: 1fr 1fr;">
+              <input type="number" id="in-ou-corn-75-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-75-over" placeholder="Over 7.5">
+              <input type="number" id="in-ou-corn-75-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-75-under" placeholder="Under 7.5">
+              
+              <input type="number" id="in-ou-corn-85-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-85-over" placeholder="Over 8.5">
+              <input type="number" id="in-ou-corn-85-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-85-under" placeholder="Under 8.5">
+              
+              <input type="number" id="in-ou-corn-95-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-95-over" placeholder="Over 9.5">
+              <input type="number" id="in-ou-corn-95-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-95-under" placeholder="Under 9.5">
+              
+              <input type="number" id="in-ou-corn-105-over" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-105-over" placeholder="Over 10.5">
+              <input type="number" id="in-ou-corn-105-under" step="0.01" min="1.01" class="odds-input-field dyn-odds" data-target="ev-ou-corn-105-under" placeholder="Under 10.5">
             </div>
           </div>
 
@@ -245,6 +338,25 @@
           </ol>
         </div>
 
+        <!-- Visualización Analítica (Gráficos) -->
+        <div class="analytics-charts-section glass-card">
+          <h3>Visualización Analítica</h3>
+          <div class="analytics-grid">
+            <div class="analytics-chart-box">
+              <h4>Distribución de Goles (Poisson)</h4>
+              <div class="chart-canvas-wrapper">
+                <canvas id="goalsDistributionChart"></canvas>
+              </div>
+            </div>
+            <div class="analytics-chart-box">
+              <h4>Probabilidad de Resultado</h4>
+              <div class="chart-canvas-wrapper">
+                <canvas id="outcomeDonutChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Nuevos Mercados de Goles -->
         <div class="goals-markets-section glass-card hidden" id="goals-markets-card">
           <h3>Otros Mercados de Goles</h3>
@@ -252,23 +364,23 @@
             <div class="market-box">
               <h4>Ambos Equipos Anotan (BTTS)</h4>
               <div class="market-odds-row">
-                <div><span>Sí: </span><strong id="market-btts-yes">--</strong></div>
-                <div><span>No: </span><strong id="market-btts-no">--</strong></div>
+                <div><span>Sí: </span><strong id="market-btts-yes">--</strong><span id="ev-btts-yes" class="ev-mini"></span></div>
+                <div><span>No: </span><strong id="market-btts-no">--</strong><span id="ev-btts-no" class="ev-mini"></span></div>
               </div>
             </div>
             <div class="market-box">
               <h4>Doble Oportunidad</h4>
               <div class="market-odds-row">
-                <div><span>1X: </span><strong id="market-dc-1X">--</strong></div>
-                <div><span>12: </span><strong id="market-dc-12">--</strong></div>
-                <div><span>X2: </span><strong id="market-dc-X2">--</strong></div>
+                <div><span>1X: </span><strong id="market-dc-1X">--</strong><span id="ev-dc-1X" class="ev-mini"></span></div>
+                <div><span>12: </span><strong id="market-dc-12">--</strong><span id="ev-dc-12" class="ev-mini"></span></div>
+                <div><span>X2: </span><strong id="market-dc-X2">--</strong><span id="ev-dc-X2" class="ev-mini"></span></div>
               </div>
             </div>
             <div class="market-box">
               <h4>Empate No Válido (DNB)</h4>
               <div class="market-odds-row">
-                <div><span id="label-dnb-1">DNB 1: </span><strong id="market-dnb-1">--</strong></div>
-                <div><span id="label-dnb-2">DNB 2: </span><strong id="market-dnb-2">--</strong></div>
+                <div><span id="label-dnb-1">DNB 1: </span><strong id="market-dnb-1">--</strong><span id="ev-dnb-1" class="ev-mini"></span></div>
+                <div><span id="label-dnb-2">DNB 2: </span><strong id="market-dnb-2">--</strong><span id="ev-dnb-2" class="ev-mini"></span></div>
               </div>
             </div>
           </div>
@@ -284,6 +396,22 @@
                 </tr>
               </thead>
               <tbody id="ou-goals-tbody">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+
+          <h4 style="margin-top: 15px; margin-bottom: 8px;">Hándicap Asiático (AH)</h4>
+          <div class="ou-table-container">
+            <table class="ou-table">
+              <thead>
+                <tr>
+                  <th>Línea</th>
+                  <th id="th-ah-a">Eq. A (%)</th>
+                  <th id="th-ah-b">Eq. B (%)</th>
+                </tr>
+              </thead>
+              <tbody id="ah-tbody">
                 <!-- Dinámico -->
               </tbody>
             </table>
@@ -326,9 +454,9 @@
           
           <h4 style="margin-top: 15px; margin-bottom: 8px;">Más Córners (1X2)</h4>
           <div class="market-odds-row">
-            <div><span id="label-most-corners-a">Uruguay: </span><strong id="prob-most-corners-a">--</strong></div>
-            <div><span>Empate: </span><strong id="prob-most-corners-draw">--</strong></div>
-            <div><span id="label-most-corners-b">Arabia Saudita: </span><strong id="prob-most-corners-b">--</strong></div>
+            <div><span id="label-most-corners-a">Uruguay: </span><strong id="prob-most-corners-a">--</strong><span id="ev-most-corners-a" class="ev-mini"></span></div>
+            <div><span>Empate: </span><strong id="prob-most-corners-draw">--</strong><span id="ev-most-corners-draw" class="ev-mini"></span></div>
+            <div><span id="label-most-corners-b">Arabia Saudita: </span><strong id="prob-most-corners-b">--</strong><span id="ev-most-corners-b" class="ev-mini"></span></div>
           </div>
         </div>
 
@@ -369,6 +497,7 @@
         <div class="tab-header">
           <button id="tab-btn-history" class="tab-btn active">📈 Historial Reciente</button>
           <button id="tab-btn-h2h" class="tab-btn">⚔️ Historial Directo (H2H)</button>
+          <button id="tab-btn-backtest" class="tab-btn" style="flex: 1; padding: 10px 5px; font-size: 0.85rem;">💰 Backtest & ROI</button>
         </div>
 
         <div class="tab-content" id="tab-history">
@@ -418,6 +547,69 @@
             <h4>Encuentros Históricos Oficiales</h4>
             <div class="match-list" id="h2h-match-list">
               <div class="no-matches-message">No se registran enfrentamientos previos en la base de datos.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content hidden" id="tab-backtest">
+          <div class="glass-card" style="margin-bottom: 15px;">
+            <h3 style="margin-bottom: 8px;">Rendimiento del Modelo (Backtest)</h3>
+            <p class="slider-desc" style="margin-bottom: 15px;">Evaluación sobre más de 49,000 partidos históricos enfrentando al modelo contra un Bookmaker Simulado (Margen 5%).</p>
+            
+            <button id="btn-run-backtest" class="btn btn-primary" style="width: 100%; padding: 12px;">
+              <span class="btn-text">🚀 EJECUTAR BACKTEST (Tarda ~5s)</span>
+              <div class="spinner hidden" id="backtest-spinner"></div>
+            </button>
+          </div>
+
+          <div id="backtest-results-container" class="hidden">
+            <div class="h2h-summary-card glass-card" style="margin-bottom: 15px;">
+              <h4 style="margin-bottom: 10px; color: var(--accent-primary);">Métricas Financieras (Apuestas +EV)</h4>
+              <div class="h2h-stats-row" style="margin-bottom: 10px;">
+                <div class="h2h-stat">
+                  <span class="h2h-stat-num" id="bt-roi" style="color: #10B981;">--%</span>
+                  <span class="h2h-stat-label">Yield (ROI)</span>
+                </div>
+                <div class="h2h-stat">
+                  <span class="h2h-stat-num" id="bt-profit" style="color: #10B981;">--</span>
+                  <span class="h2h-stat-label">Beneficio (Unidades)</span>
+                </div>
+              </div>
+              <div class="h2h-stats-row">
+                <div class="h2h-stat">
+                  <span class="h2h-stat-num" id="bt-bets" style="font-size: 1.2rem;">--</span>
+                  <span class="h2h-stat-label">Apuestas Realizadas</span>
+                </div>
+                <div class="h2h-stat">
+                  <span class="h2h-stat-num" id="bt-hitrate" style="font-size: 1.2rem;">--%</span>
+                  <span class="h2h-stat-label">Hit Rate (Acierto)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="h2h-summary-card glass-card">
+              <h4 style="margin-bottom: 10px;">Precisión Predictiva</h4>
+              <ul style="list-style: none; padding: 0; font-size: 0.9rem;">
+                <li style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                  <span style="color: var(--text-muted);">Acierto del Favorito:</span>
+                  <strong id="bt-fav-acc">--%</strong>
+                </li>
+                <li style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                  <span style="color: var(--text-muted);">Brier Score (↓):</span>
+                  <strong id="bt-brier">--</strong>
+                </li>
+                <li style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                  <span style="color: var(--text-muted);">Log Loss (↓):</span>
+                  <strong id="bt-logloss">--</strong>
+                </li>
+                <li style="display: flex; justify-content: space-between; padding: 4px 0;">
+                  <span style="color: var(--text-muted);">Partidos Evaluados:</span>
+                  <strong id="bt-matches">--</strong>
+                </li>
+              </ul>
+              <div style="margin-top: 10px; font-size: 0.75rem; color: var(--text-muted); text-align: right;">
+                Última ejecución: <span id="bt-date">--</span>
+              </div>
             </div>
           </div>
         </div>

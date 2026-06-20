@@ -18,47 +18,45 @@ if sys.platform == 'win32':
 
 # BASE_DIR es la carpeta del script (data/). RESULTS_CSV apunta a data/results.csv
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RESULTS_CSV = os.path.join(BASE_DIR, "results.csv")
 
-SOURCES = [
-    "https://raw.githubusercontent.com/martj42/international_results/master/results.csv",
-    "https://raw.githubusercontent.com/martj42/international-football-results/master/results.csv",
-    "https://raw.githubusercontent.com/datasets/football-results/main/data/results.csv",
-]
+FILES_TO_DOWNLOAD = {
+    "results.csv": "https://raw.githubusercontent.com/martj42/international_results/master/results.csv",
+    "shootouts.csv": "https://raw.githubusercontent.com/martj42/international_results/master/shootouts.csv",
+    "goalscorers.csv": "https://raw.githubusercontent.com/martj42/international_results/master/goalscorers.csv"
+}
 
-def download_results():
-    """Intenta descargar el results.csv más reciente desde fuentes públicas."""
-    for url in SOURCES:
-        try:
-            print(f"  Intentando: {url[:70]}...")
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=30) as response:
-                content = response.read().decode("utf-8")
-            lines = content.strip().split("\n")
-            if len(lines) < 100:
-                print(f"  Datos insuficientes ({len(lines)} líneas), probando siguiente fuente...")
-                continue
-            print(f"  OK - {len(lines)-1:,} partidos encontrados")
-            return content
-        except Exception as e:
-            print(f"  Fallo: {e}")
-            continue
-    return None
+def download_file(url, file_name):
+    """Intenta descargar un archivo especifico."""
+    try:
+        print(f"  Descargando {file_name}...")
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            content = response.read().decode("utf-8")
+        lines = content.strip().split("\n")
+        if len(lines) < 10:
+            print(f"  [ERROR] Datos insuficientes para {file_name}.")
+            return None
+        print(f"  OK - {file_name} ({len(lines)-1:,} registros)")
+        return content
+    except Exception as e:
+        print(f"  [Fallo] al descargar {file_name}: {e}")
+        return None
 
-def save_with_backup(content):
+def save_with_backup(content, file_name):
     """Guarda el CSV creando un backup del anterior."""
-    if os.path.exists(RESULTS_CSV):
-        backup = RESULTS_CSV + ".bak"
-        shutil.copy2(RESULTS_CSV, backup)
-        print(f"  Backup creado: data/results.csv.bak")
+    file_path = os.path.join(BASE_DIR, file_name)
+    if os.path.exists(file_path):
+        backup = file_path + ".bak"
+        shutil.copy2(file_path, backup)
 
-    with open(RESULTS_CSV, "w", encoding="utf-8", newline="") as f:
+    with open(file_path, "w", encoding="utf-8", newline="") as f:
         f.write(content)
-    print(f"  results.csv guardado correctamente.")
+    print(f"  -> {file_name} guardado correctamente.")
 
 def show_recent_matches(n=10):
-    """Muestra los N partidos más recientes del CSV."""
-    with open(RESULTS_CSV, "r", encoding="utf-8") as f:
+    """Muestra los N partidos más recientes de results.csv."""
+    results_path = os.path.join(BASE_DIR, "results.csv")
+    with open(results_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
 
@@ -86,16 +84,21 @@ def main():
     print("  Actualizando Partidos de Selecciones Nacionales")
     print("=" * 60)
 
-    # --- Paso 1: Descargar ---
+    # --- Paso 1: Descargar archivos CSV ---
     print("\n[1/2] Descargando datos actualizados...")
-    content = download_results()
+    
+    success = True
+    for file_name, url in FILES_TO_DOWNLOAD.items():
+        content = download_file(url, file_name)
+        if content is None:
+            success = False
+        else:
+            save_with_backup(content, file_name)
 
-    if content is None:
-        print("\n[ERROR] No se pudo descargar desde ninguna fuente.")
+    if not success:
+        print("\n[ADVERTENCIA] Hubo problemas descargando algunos archivos.")
         print("   Revisa tu conexion a internet e intentalo mas tarde.")
-        return 1
-
-    save_with_backup(content)
+        # We don't return 1 here so Elo recalculation can still try to run on whatever data exists.
 
     # --- Paso 2: Mostrar partidos recientes ---
     print("\n[2/2] Partidos más recientes descargados:")

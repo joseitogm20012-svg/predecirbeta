@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-06-19T00:33:30.605644",
+  "last_updated": "2026-06-20T02:21:25.445773",
   "methodology": "xG calculado a partir de datos reales del Mundial en FBref (goles/90min + eficiencia de remate), mezclado con historial estimado. source='fbref_world_cup' indica datos reales de Copa del Mundo.",
   "fbref_teams_count": 58,
   "total_teams": 341,
