@@ -15,6 +15,9 @@ XG_PATH = os.path.join(BASE_DIR, "data", "xg_by_team.json")
 # Core Dixon-Coles correlation adjustment
 DC_RHO = -0.13
 
+# Altitude acclimated teams (Fase 5)
+ALTITUDE_ACCLIMATED_TEAMS = {"mexico", "ecuador", "colombia", "bolivia"}
+
 # Load xG data at module initialization
 _cached_xg_data = None
 def load_xg_data():
@@ -509,30 +512,63 @@ def get_team_corner_stats(team_slug, xg_data, avg_gs):
     sh_off = 4.0 * form_factor
     return sh, crs, sh_blocked, sh_off
 
-def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings, xg_data):
-    # 1. Obtener xG real si está disponible usando la función desacoplada
+def load_match_raw_data(team_a, team_b, half_life_months, matches, ratings, xg_data):
+    """
+    Fase 2: Separación de responsabilidades - Carga de datos crudos.
+    """
     xg_real_a_home, source_a_tag = get_team_real_xg(team_a, xg_data)
     xg_real_b_away, source_b_tag = get_team_real_xg(team_b, xg_data)
 
-    # Get form stats
     gs_a, gc_a = get_team_form_stats(team_a, matches, ratings, half_life_months)
     gs_b, gc_b = get_team_form_stats(team_b, matches, ratings, half_life_months)
     
-    # 2. Base expected goals from historical forms
+    elo_a = ratings.get(team_a, 1500)
+    elo_b = ratings.get(team_b, 1500)
+    
+    h2h = get_h2h_stats(team_a, team_b, matches)
+    
+    return {
+        "xg_real_a_home": xg_real_a_home,
+        "source_a_tag": source_a_tag,
+        "xg_real_b_away": xg_real_b_away,
+        "source_b_tag": source_b_tag,
+        "gs_a": gs_a,
+        "gc_a": gc_a,
+        "gs_b": gs_b,
+        "gc_b": gc_b,
+        "elo_a": elo_a,
+        "elo_b": elo_b,
+        "h2h_count": h2h["count"],
+        "h2h_avg_gd": h2h["avgGd"]
+    }
+
+def compute_xg_from_raw_data(raw_data, rank_a, rank_b, fifa_weight, h2h_weight):
+    """
+    Fase 2: Separación de responsabilidades - Cálculo matemático puro de xG.
+    """
+    gs_a = raw_data["gs_a"]
+    gc_a = raw_data["gc_a"]
+    gs_b = raw_data["gs_b"]
+    gc_b = raw_data["gc_b"]
+    
+    # Base expected goals from historical forms
     xg_a = gs_a * gc_b
     xg_b = gs_b * gc_a
     
     # Elo fallbacks if forms are too low
-    elo_a = ratings.get(team_a, 1500)
-    elo_b = ratings.get(team_b, 1500)
+    elo_a = raw_data["elo_a"]
+    elo_b = raw_data["elo_b"]
     if xg_a <= 0.1:
         xg_a = max(0.3, 1.35 + (elo_a - elo_b) / 400.0)
     if xg_b <= 0.1:
         xg_b = max(0.3, 1.35 + (elo_b - elo_a) / 400.0)
     
-    # 3. BLEND con xG real si está disponible
-    # FBref Mundial: 70% FBref + 30% modelo (mayor confianza en datos reales)
-    # Estimado legacy: 60% estimado + 40% modelo
+    # Blend con xG real si está disponible
+    xg_real_a_home = raw_data["xg_real_a_home"]
+    source_a_tag = raw_data["source_a_tag"]
+    xg_real_b_away = raw_data["xg_real_b_away"]
+    source_b_tag = raw_data["source_b_tag"]
+    
     xg_source_a = "modelo"
     xg_source_b = "modelo"
     
@@ -546,21 +582,20 @@ def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_l
         xg_b = blend_w * xg_real_b_away + (1.0 - blend_w) * xg_b
         xg_source_b = source_b_tag
         
-    # 4. FIFA Ranking adjust
-    rank_diff = rank_b - rank_a # positive = A is higher ranked
+    # FIFA Ranking adjust
+    rank_diff = rank_b - rank_a
     fifa_mult_a = 1.0 + (rank_diff / 100.0) * fifa_weight
     fifa_mult_b = 1.0 - (rank_diff / 100.0) * fifa_weight
     
     xg_a *= max(0.2, fifa_mult_a)
     xg_b *= max(0.2, fifa_mult_b)
     
-    # 5. H2H adjust
-    h2h = get_h2h_stats(team_a, team_b, matches)
+    # H2H adjust
     h2h_mult_a = 1.0
     h2h_mult_b = 1.0
-    if h2h["count"] > 0:
-        h2h_mult_a = 1.0 + (h2h["avgGd"] / 4.0) * h2h_weight
-        h2h_mult_b = 1.0 - (h2h["avgGd"] / 4.0) * h2h_weight
+    if raw_data["h2h_count"] > 0:
+        h2h_mult_a = 1.0 + (raw_data["h2h_avg_gd"] / 4.0) * h2h_weight
+        h2h_mult_b = 1.0 - (raw_data["h2h_avg_gd"] / 4.0) * h2h_weight
         xg_a *= max(0.2, h2h_mult_a)
         xg_b *= max(0.2, h2h_mult_b)
         
@@ -570,16 +605,44 @@ def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_l
     
     return xg_a, xg_b, h2h_mult_a, h2h_mult_b, xg_source_a, xg_source_b
 
-def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weight_pct, half_life_months, num_sims, odds_a=None, odds_draw=None, odds_b=None):
+def calculate_xg(team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings, xg_data):
+    """
+    Fase 2: Orquestador que mantiene compatibilidad hacia atrás.
+    """
+    raw_data = load_match_raw_data(team_a, team_b, half_life_months, matches, ratings, xg_data)
+    return compute_xg_from_raw_data(raw_data, rank_a, rank_b, fifa_weight, h2h_weight)
+
+def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weight_pct, half_life_months, num_sims, odds_a=None, odds_draw=None, odds_b=None, strength_override_a=1.0, strength_override_b=1.0, altitude=0):
     matches, ratings = load_data()
     
     fifa_weight = fifa_weight_pct / 100.0
     h2h_weight = h2h_weight_pct / 100.0
     
     # Calculate expected goals
+    xg_data = load_xg_data()
     xg_a, xg_b, h2h_mult_a, h2h_mult_b, xg_source_a, xg_source_b = calculate_xg(
-        team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings
+        team_a, team_b, rank_a, rank_b, fifa_weight, h2h_weight, half_life_months, matches, ratings, xg_data
     )
+    
+    # Altitude adjustments (Fase 5)
+    if altitude > 1500:
+        if team_a not in ALTITUDE_ACCLIMATED_TEAMS:
+            penalty_a = 1.0 - 0.08 * ((altitude - 1500) / 1000.0)
+            penalty_a = max(0.70, penalty_a) # Cap penalty at 30%
+            xg_a *= penalty_a
+            
+        if team_b not in ALTITUDE_ACCLIMATED_TEAMS:
+            penalty_b = 1.0 - 0.08 * ((altitude - 1500) / 1000.0)
+            penalty_b = max(0.70, penalty_b)
+            xg_b *= penalty_b
+
+    # Strength overrides (Fase 4)
+    xg_a *= strength_override_a
+    xg_b *= strength_override_b
+
+    # Re-clamp expected goals after modifications
+    xg_a = max(0.1, min(4.5, xg_a))
+    xg_b = max(0.1, min(4.5, xg_b))
     
     # Calculate exact joint probabilities up to 10 goals
     joint_probs = {}
@@ -718,15 +781,37 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
     entry_a = xg_data.get(team_a, {})
     entry_b = xg_data.get(team_b, {})
 
-    sh_a = entry_a.get("shots_per_90") or 11.5
-    crs_a = entry_a.get("crosses_per_90") or 13.0
-    sh_blocked_a = entry_a.get("shots_blocked_per_90", 0)
-    sh_off_a = entry_a.get("shots_off_target_per_90", 0)
+    # Smart Defaults per Team based on calculated expected goals (Fase 3)
+    # Average xG is ~1.35. Proportional scaling factor.
+    factor_a = xg_a / 1.35
+    factor_b = xg_b / 1.35
+
+    sh_a = entry_a.get("shots_per_90") or max(5.0, min(25.0, 11.5 * factor_a))
+    crs_a = entry_a.get("crosses_per_90") or max(5.0, min(25.0, 13.0 * factor_a))
     
-    sh_b = entry_b.get("shots_per_90") or 11.5
-    crs_b = entry_b.get("crosses_per_90") or 13.0
-    sh_blocked_b = entry_b.get("shots_blocked_per_90", 0)
-    sh_off_b = entry_b.get("shots_off_target_per_90", 0)
+    # If the team has blocked/off-target shots data, use it. Otherwise, use scaled defaults.
+    if "shots_blocked_per_90" in entry_a and entry_a["shots_blocked_per_90"] is not None:
+        sh_blocked_a = entry_a["shots_blocked_per_90"]
+    else:
+        sh_blocked_a = 1.5 * factor_a
+
+    if "shots_off_target_per_90" in entry_a and entry_a["shots_off_target_per_90"] is not None:
+        sh_off_a = entry_a["shots_off_target_per_90"]
+    else:
+        sh_off_a = 4.0 * factor_a
+        
+    sh_b = entry_b.get("shots_per_90") or max(5.0, min(25.0, 11.5 * factor_b))
+    crs_b = entry_b.get("crosses_per_90") or max(5.0, min(25.0, 13.0 * factor_b))
+    
+    if "shots_blocked_per_90" in entry_b and entry_b["shots_blocked_per_90"] is not None:
+        sh_blocked_b = entry_b["shots_blocked_per_90"]
+    else:
+        sh_blocked_b = 1.5 * factor_b
+
+    if "shots_off_target_per_90" in entry_b and entry_b["shots_off_target_per_90"] is not None:
+        sh_off_b = entry_b["shots_off_target_per_90"]
+    else:
+        sh_off_b = 4.0 * factor_b
 
     # Corner Attack Multipliers (based on shots, blocked/off-target, and crosses)
     if sh_blocked_a + sh_off_a > 0:
@@ -747,9 +832,21 @@ def run_prediction_sim(team_a, team_b, rank_a, rank_b, fifa_weight_pct, h2h_weig
     concession_a = max(0.5, min(1.8, 10 ** (-elo_diff / 800.0)))
     concession_b = max(0.5, min(1.8, 10 ** (elo_diff / 800.0)))
 
-    # Expected corners lambda
-    lambda_corners_a = max(1.5, min(9.5, 5.0 * cam_a * concession_b))
-    lambda_corners_b = max(1.5, min(9.5, 4.0 * cam_b * concession_a))
+    # Expected corners lambda using corners_for_per_90 if available (Fase 1)
+    corners_for_a = entry_a.get("corners_for_per_90")
+    if corners_for_a is not None and corners_for_a > 0:
+        expected_corners_base_a = corners_for_a
+    else:
+        expected_corners_base_a = 5.0 * cam_a
+
+    corners_for_b = entry_b.get("corners_for_per_90")
+    if corners_for_b is not None and corners_for_b > 0:
+        expected_corners_base_b = corners_for_b
+    else:
+        expected_corners_base_b = 4.0 * cam_b
+
+    lambda_corners_a = max(1.5, min(9.5, expected_corners_base_a * concession_b))
+    lambda_corners_b = max(1.5, min(9.5, expected_corners_base_b * concession_a))
 
     # Simulate Corners (Poisson distribution)
     sim_corners_a = np.random.poisson(lambda_corners_a, num_sims)

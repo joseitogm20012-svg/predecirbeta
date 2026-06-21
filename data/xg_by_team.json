@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-06-20T02:21:25.445773",
+  "last_updated": "2026-06-20T19:13:52.720932",
   "methodology": "xG calculado a partir de datos reales del Mundial en FBref (goles/90min + eficiencia de remate), mezclado con historial estimado. source='fbref_world_cup' indica datos reales de Copa del Mundo.",
   "fbref_teams_count": 58,
   "total_teams": 341,
@@ -11,6 +11,10 @@
       "xga_overall": 1.232,
       "shots_per_90": 9.0,
       "crosses_per_90": 14.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -24,6 +28,10 @@
       "xga_overall": 0.955,
       "shots_per_90": 15.919,
       "crosses_per_90": 15.334,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 8.941,
       "matches_played": 14,
       "seasons": [
         "2026",
@@ -39,6 +47,10 @@
       "xga_overall": 1.598,
       "shots_per_90": 7.667,
       "crosses_per_90": 12.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 5.667,
       "matches_played": 3,
       "seasons": [
         "2022"
@@ -60,6 +72,10 @@
       "xga_overall": 1.326,
       "shots_per_90": 13.818,
       "crosses_per_90": 19.872,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 9.081,
       "matches_played": 5,
       "seasons": [
         "2026",
@@ -74,6 +90,10 @@
       "xga_overall": 1.304,
       "shots_per_90": 12.234,
       "crosses_per_90": 21.243,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 9.459,
       "matches_played": 4,
       "seasons": [
         "2026",
@@ -88,6 +108,10 @@
       "xga_overall": 1.214,
       "shots_per_90": 17.608,
       "crosses_per_90": 28.179,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 11.435,
       "matches_played": 9,
       "seasons": [
         "2026",
@@ -103,6 +127,10 @@
       "xga_overall": 1.005,
       "shots_per_90": 11.965,
       "crosses_per_90": 11.091,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.649,
       "matches_played": 13,
       "seasons": [
         "2026",
@@ -118,6 +146,10 @@
       "xga_overall": 1.528,
       "shots_per_90": 11.0,
       "crosses_per_90": 17.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -147,6 +179,10 @@
       "xga_overall": 1.512,
       "shots_per_90": 13.83,
       "crosses_per_90": 16.53,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 10.235,
       "matches_played": 11,
       "seasons": [
         "2026",
@@ -162,6 +198,10 @@
       "xga_overall": 1.293,
       "shots_per_90": 11.992,
       "crosses_per_90": 13.277,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.289,
       "matches_played": 15,
       "seasons": [
         "2026",
@@ -177,6 +217,10 @@
       "xga_overall": 1.634,
       "shots_per_90": 17.25,
       "crosses_per_90": 24.075,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 12.52,
       "matches_played": 9,
       "seasons": [
         "2026",
@@ -216,6 +260,10 @@
       "xga_overall": 1.225,
       "shots_per_90": 9.046,
       "crosses_per_90": 17.506,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 4.416,
       "matches_played": 6,
       "seasons": [
         "2026",
@@ -246,6 +294,10 @@
       "xga_overall": 0.948,
       "shots_per_90": 3.0,
       "crosses_per_90": 8.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 1.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -259,6 +311,10 @@
       "xga_overall": 1.162,
       "shots_per_90": 24.087,
       "crosses_per_90": 21.953,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 14.947,
       "matches_played": 7,
       "seasons": [
         "2026",
@@ -274,6 +330,10 @@
       "xga_overall": 1.29,
       "shots_per_90": 12.212,
       "crosses_per_90": 12.945,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.552,
       "matches_played": 6,
       "seasons": [
         "2026",
@@ -288,6 +348,10 @@
       "xga_overall": 1.623,
       "shots_per_90": 12.0,
       "crosses_per_90": 17.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -301,6 +365,10 @@
       "xga_overall": 1.342,
       "shots_per_90": 10.453,
       "crosses_per_90": 17.896,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.355,
       "matches_played": 7,
       "seasons": [
         "2022",
@@ -331,6 +399,10 @@
       "xga_overall": 0.981,
       "shots_per_90": 8.596,
       "crosses_per_90": 16.667,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 5.439,
       "matches_played": 6,
       "seasons": [
         "2018"
@@ -384,6 +456,10 @@
       "xga_overall": 0.904,
       "shots_per_90": 16.406,
       "crosses_per_90": 19.128,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 9.864,
       "matches_played": 11,
       "seasons": [
         "2026",
@@ -407,6 +483,10 @@
       "xga_overall": 1.153,
       "shots_per_90": 10.144,
       "crosses_per_90": 17.124,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.927,
       "matches_played": 9,
       "seasons": [
         "2026",
@@ -422,6 +502,10 @@
       "xga_overall": 1.425,
       "shots_per_90": 9.0,
       "crosses_per_90": 5.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 8.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -459,6 +543,10 @@
       "xga_overall": 0.897,
       "shots_per_90": 18.828,
       "crosses_per_90": 25.237,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 13.433,
       "matches_played": 9,
       "seasons": [
         "2026",
@@ -474,6 +562,10 @@
       "xga_overall": 1.013,
       "shots_per_90": 12.293,
       "crosses_per_90": 13.525,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 9.949,
       "matches_played": 4,
       "seasons": [
         "2026",
@@ -512,6 +604,10 @@
       "xga_overall": 1.185,
       "shots_per_90": 6.022,
       "crosses_per_90": 10.611,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 3.4,
       "matches_played": 6,
       "seasons": [
         "2022",
@@ -542,6 +638,10 @@
       "xga_overall": 1.346,
       "shots_per_90": 8.731,
       "crosses_per_90": 13.578,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.867,
       "matches_played": 7,
       "seasons": [
         "2022",
@@ -556,6 +656,10 @@
       "xga_overall": 1.119,
       "shots_per_90": 10.402,
       "crosses_per_90": 21.596,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.59,
       "matches_played": 10,
       "seasons": [
         "2026",
@@ -579,6 +683,10 @@
       "xga_overall": 1.501,
       "shots_per_90": 14.0,
       "crosses_per_90": 12.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -592,6 +700,10 @@
       "xga_overall": 1.064,
       "shots_per_90": 8.323,
       "crosses_per_90": 15.737,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 5.61,
       "matches_played": 8,
       "seasons": [
         "2026",
@@ -631,6 +743,10 @@
       "xga_overall": 1.05,
       "shots_per_90": 14.947,
       "crosses_per_90": 18.238,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 10.867,
       "matches_played": 8,
       "seasons": [
         "2026",
@@ -710,6 +826,10 @@
       "xga_overall": 1.344,
       "shots_per_90": 15.0,
       "crosses_per_90": 23.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 13.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -755,6 +875,10 @@
       "xga_overall": 1.398,
       "shots_per_90": 10.0,
       "crosses_per_90": 12.333,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.333,
       "matches_played": 3,
       "seasons": [
         "2018"
@@ -880,6 +1004,10 @@
       "xga_overall": 1.154,
       "shots_per_90": 12.755,
       "crosses_per_90": 15.137,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 9.232,
       "matches_played": 5,
       "seasons": [
         "2026",
@@ -894,6 +1022,10 @@
       "xga_overall": 1.525,
       "shots_per_90": 9.818,
       "crosses_per_90": 17.192,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.343,
       "matches_played": 4,
       "seasons": [
         "2026",
@@ -916,6 +1048,10 @@
       "xga_overall": 1.527,
       "shots_per_90": 10.928,
       "crosses_per_90": 16.297,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 8.856,
       "matches_played": 4,
       "seasons": [
         "2026",
@@ -970,6 +1106,10 @@
       "xga_overall": 1.01,
       "shots_per_90": 11.193,
       "crosses_per_90": 17.838,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.168,
       "matches_played": 17,
       "seasons": [
         "2026",
@@ -1009,6 +1149,10 @@
       "xga_overall": 0.791,
       "shots_per_90": 12.333,
       "crosses_per_90": 15.987,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 9.567,
       "matches_played": 7,
       "seasons": [
         "2026",
@@ -1056,6 +1200,10 @@
       "xga_overall": 1.678,
       "shots_per_90": 11.0,
       "crosses_per_90": 17.333,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.667,
       "matches_played": 3,
       "seasons": [
         "2018"
@@ -1141,6 +1289,10 @@
       "xga_overall": null,
       "shots_per_90": 13.11,
       "crosses_per_90": 16.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 8.4,
       "matches_played": 8,
       "seasons": [
         "2026",
@@ -1196,6 +1348,10 @@
       "xga_overall": 1.002,
       "shots_per_90": 12.667,
       "crosses_per_90": 16.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 10.0,
       "matches_played": 3,
       "seasons": [
         "2018"
@@ -1217,6 +1373,10 @@
       "xga_overall": 1.098,
       "shots_per_90": 10.956,
       "crosses_per_90": 19.389,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 8.244,
       "matches_played": 6,
       "seasons": [
         "2022",
@@ -1239,6 +1399,10 @@
       "xga_overall": 1.043,
       "shots_per_90": 8.153,
       "crosses_per_90": 16.153,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 5.694,
       "matches_played": 4,
       "seasons": [
         "2026",
@@ -1373,6 +1537,10 @@
       "xga_overall": 1.039,
       "shots_per_90": 9.333,
       "crosses_per_90": 17.667,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 4.0,
       "matches_played": 3,
       "seasons": [
         "2022"
@@ -1474,6 +1642,10 @@
       "xga_overall": 1.024,
       "shots_per_90": 8.973,
       "crosses_per_90": 15.493,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.313,
       "matches_played": 7,
       "seasons": [
         "2026",
@@ -1505,6 +1677,10 @@
       "xga_overall": 0.801,
       "shots_per_90": 11.474,
       "crosses_per_90": 14.606,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 8.616,
       "matches_played": 11,
       "seasons": [
         "2026",
@@ -1528,6 +1704,10 @@
       "xga_overall": 1.123,
       "shots_per_90": 6.0,
       "crosses_per_90": 4.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 5.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -1541,6 +1721,10 @@
       "xga_overall": 0.995,
       "shots_per_90": 15.0,
       "crosses_per_90": 7.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 11.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -1594,6 +1778,10 @@
       "xga_overall": 0.934,
       "shots_per_90": 11.0,
       "crosses_per_90": 13.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 10.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -1615,6 +1803,10 @@
       "xga_overall": 0.942,
       "shots_per_90": 9.595,
       "crosses_per_90": 13.622,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.735,
       "matches_played": 8,
       "seasons": [
         "2026",
@@ -1678,6 +1870,10 @@
       "xga_overall": 0.997,
       "shots_per_90": 7.0,
       "crosses_per_90": 8.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -1699,6 +1895,10 @@
       "xga_overall": 1.119,
       "shots_per_90": 11.0,
       "crosses_per_90": 15.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 7.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -1736,6 +1936,10 @@
       "xga_overall": 1.049,
       "shots_per_90": 9.007,
       "crosses_per_90": 11.64,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.293,
       "matches_played": 7,
       "seasons": [
         "2026",
@@ -1831,6 +2035,10 @@
       "xga_overall": 1.208,
       "shots_per_90": 6.847,
       "crosses_per_90": 10.757,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 3.766,
       "matches_played": 4,
       "seasons": [
         "2026",
@@ -2253,6 +2461,10 @@
       "xga_overall": 1.113,
       "shots_per_90": 8.0,
       "crosses_per_90": 13.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -2298,6 +2510,10 @@
       "xga_overall": 1.025,
       "shots_per_90": 7.0,
       "crosses_per_90": 15.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 3.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -3023,6 +3239,10 @@
       "xga_overall": null,
       "shots_per_90": 8.0,
       "crosses_per_90": 10.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 5.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -3036,6 +3256,10 @@
       "xga_overall": null,
       "shots_per_90": 8.0,
       "crosses_per_90": 9.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -3049,6 +3273,10 @@
       "xga_overall": null,
       "shots_per_90": 8.0,
       "crosses_per_90": 7.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 6.0,
       "matches_played": 1,
       "seasons": [
         "2026"
@@ -3073,6 +3301,10 @@
       "xga_overall": null,
       "shots_per_90": 30.0,
       "crosses_per_90": 26.0,
+      "corners_for_per_90": null,
+      "corners_against_per_90": null,
+      "shots_blocked_per_90": null,
+      "shots_off_target_per_90": 22.0,
       "matches_played": 1,
       "seasons": [
         "2026"

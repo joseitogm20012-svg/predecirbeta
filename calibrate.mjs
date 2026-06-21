@@ -27,7 +27,26 @@ const recency = (tsSec, nowSec) => Math.pow(0.5, ((nowSec - tsSec) / (30.44 * 86
 const expectedScore = (a, b, hb) => 1 / (1 + Math.pow(10, (b - (a + hb)) / 400));
 const gMult = (gd) => { const d = Math.abs(gd); return d <= 1 ? 1 : d === 2 ? 1.5 : (11 + d) / 8; };
 
-const { matches } = JSON.parse(readFileSync(D("results.json"), "utf8"));
+let matches = [];
+try {
+  const csvText = readFileSync(D("results.csv"), "utf8");
+  const lines = csvText.trim().split(/\r?\n/);
+  for (let i = 1; i < lines.length; i++) {
+    const p = lines[i].split(',');
+    if (p.length < 6) continue;
+    const date = p[0], homeName = p[1], awayName = p[2], hgStr = p[3], agStr = p[4], leagueName = p[5];
+    if (!homeName || !awayName) continue;
+    const hg = (hgStr === 'NA' || isNaN(parseInt(hgStr))) ? null : parseInt(hgStr);
+    const ag = (agStr === 'NA' || isNaN(parseInt(agStr))) ? null : parseInt(agStr);
+    const homeSlug = homeName.toLowerCase().replace(/ /g, '-').replace(/'/g, '').replace(/\./g, '');
+    const awaySlug = awayName.toLowerCase().replace(/ /g, '-').replace(/'/g, '').replace(/\./g, '');
+    const ts = Math.floor(new Date(date).getTime() / 1000);
+    matches.push({ date, homeName, awayName, hg, ag, leagueName, homeSlug, awaySlug, ts });
+  }
+} catch (e) {
+  console.error("No se pudo leer data/results.csv. Asegúrate de ejecutar update_results.bat primero.");
+  process.exit(1);
+}
 const nowSec = matches.length ? matches[matches.length - 1].ts : Math.floor(Date.now() / 1000);
 
 const R = {};

@@ -107,6 +107,25 @@
             <input type="number" id="input-sims" min="1000" max="100000" step="1000" value="100000" class="param-input">
           </div>
 
+          <!-- Overrides and Altitude (Fases 4 & 5) -->
+          <div class="param-row">
+            <span class="param-label">Fuerza Override – Selección A</span>
+            <input type="number" id="input-override-a" min="0.1" max="2.0" step="0.05" value="1.0" class="param-input">
+          </div>
+          <p class="slider-desc">Ajuste manual para Selección A (ej. 0.85 por bajas/lesiones).</p>
+
+          <div class="param-row">
+            <span class="param-label">Fuerza Override – Selección B</span>
+            <input type="number" id="input-override-b" min="0.1" max="2.0" step="0.05" value="1.0" class="param-input">
+          </div>
+          <p class="slider-desc">Ajuste manual para Selección B (ej. 0.85 por bajas/lesiones).</p>
+
+          <div class="param-row">
+            <span class="param-label">Altitud del Estadio (m)</span>
+            <input type="number" id="input-altitude" min="0" max="4000" step="100" value="0" class="param-input">
+          </div>
+          <p class="slider-desc">Altitud del partido. Penaliza a equipos no aclimatados (>1500m).</p>
+
           <hr class="panel-divider">
           <h3>Cuotas de Apuestas</h3>
           <p class="slider-desc" style="margin-bottom: 6px;">Compara la probabilidad simulada con cuotas reales para detectar valor esperado (+EV).</p>
@@ -245,10 +264,14 @@
         </div>
 
         <!-- Action Button -->
-        <div class="action-container">
-          <button id="btn-simulate" class="btn btn-primary btn-glow">
+        <div class="action-container" style="display: flex; gap: 15px; justify-content: center; width: 100%;">
+          <button id="btn-simulate" class="btn btn-primary btn-glow" style="flex: 2;">
             <span class="btn-text">🚀 SIMULAR 100,000 PARTIDOS</span>
             <div class="spinner hidden" id="sim-spinner"></div>
+          </button>
+          <button id="btn-log-pick" class="btn btn-secondary btn-glow" style="flex: 1; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: rgba(16, 185, 129, 0.3);">
+            <span class="btn-text">📥 GUARDAR PICK</span>
+            <div class="spinner hidden" id="log-pick-spinner"></div>
           </button>
         </div>
 
@@ -494,10 +517,11 @@
 
       <!-- Panel Derecho: Historial y H2H -->
       <section class="panel glass-panel" aria-label="Estadísticas de Formas e Historial">
-        <div class="tab-header">
-          <button id="tab-btn-history" class="tab-btn active">📈 Historial Reciente</button>
-          <button id="tab-btn-h2h" class="tab-btn">⚔️ Historial Directo (H2H)</button>
-          <button id="tab-btn-backtest" class="tab-btn" style="flex: 1; padding: 10px 5px; font-size: 0.85rem;">💰 Backtest & ROI</button>
+        <div class="tab-header" style="flex-wrap: wrap;">
+          <button id="tab-btn-history" class="tab-btn active">📈 Historial</button>
+          <button id="tab-btn-h2h" class="tab-btn">⚔️ H2H</button>
+          <button id="tab-btn-backtest" class="tab-btn">💰 Backtest</button>
+          <button id="tab-btn-logged" class="tab-btn">📥 Mis Picks</button>
         </div>
 
         <div class="tab-content" id="tab-history">
@@ -610,6 +634,49 @@
               <div style="margin-top: 10px; font-size: 0.75rem; color: var(--text-muted); text-align: right;">
                 Última ejecución: <span id="bt-date">--</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content hidden" id="tab-logged">
+          <div class="glass-card" style="margin-bottom: 15px;">
+            <h3 style="margin-bottom: 8px;">Mis Picks Guardados</h3>
+            <p class="slider-desc" style="margin-bottom: 15px;">Listado de predicciones registradas. Puedes contrastar tus predicciones con los resultados reales cuando se actualicen los partidos.</p>
+            
+            <button id="btn-update-logged" class="btn btn-primary" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+              <span class="btn-text">🔄 ACTUALIZAR RESULTADOS</span>
+              <div class="spinner hidden" id="logged-update-spinner"></div>
+            </button>
+          </div>
+
+          <div id="logged-summary-container" class="h2h-summary-card glass-card hidden" style="margin-bottom: 15px;">
+            <h4 style="margin-bottom: 10px; color: var(--accent-primary);">Estadísticas de Mis Picks</h4>
+            <div class="h2h-stats-row" style="margin-bottom: 10px;">
+              <div class="h2h-stat">
+                <span class="h2h-stat-num" id="logged-accuracy" style="color: #10B981;">--%</span>
+                <span class="h2h-stat-label">Acierto</span>
+              </div>
+              <div class="h2h-stat">
+                <span class="h2h-stat-num" id="logged-rps" style="color: #10B981;">--</span>
+                <span class="h2h-stat-label">Avg RPS</span>
+              </div>
+            </div>
+            <div class="h2h-stats-row">
+              <div class="h2h-stat">
+                <span class="h2h-stat-num" id="logged-total-count" style="font-size: 1.2rem;">--</span>
+                <span class="h2h-stat-label">Registrados</span>
+              </div>
+              <div class="h2h-stat">
+                <span class="h2h-stat-num" id="logged-completed-count" style="font-size: 1.2rem;">--</span>
+                <span class="h2h-stat-label">Completados</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="logged-list-container">
+            <h4>Registro de Picks</h4>
+            <div class="match-list" id="logged-match-list" style="max-height: 400px; overflow-y: auto;">
+              <div class="loading-placeholder">No hay picks registrados aún. Guarda un pick usando el botón "Guardar Pick" en el panel de simulación.</div>
             </div>
           </div>
         </div>

@@ -141,13 +141,50 @@ except Exception as e:
     fail(f"Error en H2H/historial: {e}")
 
 # ==============================
-# TEST 10: main.py API routes
+# TEST 11: Refactored calculate_xg (FASE 2)
+# ==============================
+print("\n=== TEST 11: calculate_xg load & compute refactoring ===")
+try:
+    from predictor import load_match_raw_data, compute_xg_from_raw_data, load_xg_data
+    xg_data = load_xg_data()
+    raw = load_match_raw_data('argentina', 'brazil', 18, m, r, xg_data)
+    assert "gs_a" in raw and "gs_b" in raw and "elo_a" in raw
+    ok("load_match_raw_data cargó datos de forma y Elo")
+    
+    xg_a, xg_b, _, _, _, _ = compute_xg_from_raw_data(raw, 1, 6, 0.3, 0.2)
+    assert xg_a > 0 and xg_b > 0
+    ok(f"compute_xg_from_raw_data calculó xG correctos: A={xg_a:.2f} B={xg_b:.2f}")
+except Exception as e:
+    fail(f"Error en refactorización calculate_xg: {e}")
+
+# ==============================
+# TEST 12: Overrides y Ajustes de Altitud (FASES 4 & 5)
+# ==============================
+print("\n=== TEST 12: Overrides y Ajustes de Altitud ===")
+try:
+    res_base = run_prediction_sim('argentina', 'brazil', 1, 6, 30, 20, 18, 1000)
+    xg_base_a = res_base['xgA']
+    xg_base_b = res_base['xgB']
+    
+    res_override = run_prediction_sim('argentina', 'brazil', 1, 6, 30, 20, 18, 1000, strength_override_a=0.5)
+    assert res_override['xgA'] < xg_base_a
+    ok(f"Override de fuerza aplicado: xG A base={xg_base_a:.2f} -> override={res_override['xgA']:.2f}")
+    
+    res_alt = run_prediction_sim('argentina', 'brazil', 1, 6, 30, 20, 18, 1000, altitude=3000)
+    assert res_alt['xgA'] < xg_base_a
+    assert res_alt['xgB'] < xg_base_b
+    ok(f"Ajuste por altitud (3000m) aplicado a no aclimatados: xG A={res_alt['xgA']:.2f} (base={xg_base_a:.2f}) B={res_alt['xgB']:.2f} (base={xg_base_b:.2f})")
+except Exception as e:
+    fail(f"Error en overrides/altitud: {e}")
+
+# ==============================
+# TEST 10: main.py API routes (UPDATED FASE 6)
 # ==============================
 print("\n=== TEST 10: main.py (API Routes) ===")
 try:
     from main import app
     routes = [r.path for r in app.routes]
-    required = ['/api/teams', '/api/predict', '/api/history/{team_slug}', '/api/h2h/{team_a}/{team_b}', '/api/backtest-metrics', '/api/run-backtest']
+    required = ['/api/teams', '/api/predict', '/api/history/{team_slug}', '/api/h2h/{team_a}/{team_b}', '/api/backtest-metrics', '/api/run-backtest', '/api/log-prediction', '/api/logged-predictions', '/api/update-prediction-results', '/api/resolve-prediction']
     for route in required:
         if route in routes:
             ok(f"Ruta presente: {route}")

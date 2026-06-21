@@ -74,6 +74,7 @@ let selectedTeamA = "uruguay";
 let selectedTeamB = "saudi-arabia";
 let goalsChart = null;
 let outcomeChart = null;
+let lastSimulationResult = null; // Global to store the latest simulation result for logging (Fase 6)
 
 // DOM Elements
 const selectA = document.getElementById("select-team-a");
@@ -87,8 +88,14 @@ const weightH2hSlider = document.getElementById("input-weight-h2h");
 const decaySlider = document.getElementById("input-decay");
 const simsSlider = document.getElementById("input-sims");
 
+const inputOverrideA = document.getElementById("input-override-a");
+const inputOverrideB = document.getElementById("input-override-b");
+const inputAltitude = document.getElementById("input-altitude");
+
 const btnSimulate = document.getElementById("btn-simulate");
 const simSpinner = document.getElementById("sim-spinner");
+const btnLogPick = document.getElementById("btn-log-pick");
+const logPickSpinner = document.getElementById("log-pick-spinner");
 
 // Odds Inputs
 const inputOddsA = document.getElementById("input-odds-a");
@@ -169,9 +176,21 @@ const labelMostCornersB = document.getElementById("label-most-corners-b");
 const tabHistoryBtn = document.getElementById("tab-btn-history");
 const tabH2hBtn = document.getElementById("tab-btn-h2h");
 const tabBacktestBtn = document.getElementById("tab-btn-backtest");
+const tabLoggedBtn = document.getElementById("tab-btn-logged");
 const tabHistoryContent = document.getElementById("tab-history");
 const tabH2hContent = document.getElementById("tab-h2h");
 const tabBacktestContent = document.getElementById("tab-backtest");
+const tabLoggedContent = document.getElementById("tab-logged");
+
+// Logged Picks Elements (Fase 6)
+const btnUpdateLogged = document.getElementById("btn-update-logged");
+const loggedUpdateSpinner = document.getElementById("logged-update-spinner");
+const loggedSummaryContainer = document.getElementById("logged-summary-container");
+const loggedAccuracy = document.getElementById("logged-accuracy");
+const loggedRps = document.getElementById("logged-rps");
+const loggedTotalCount = document.getElementById("logged-total-count");
+const loggedCompletedCount = document.getElementById("logged-completed-count");
+const loggedMatchList = document.getElementById("logged-match-list");
 
 // Backtest Elements
 const btnRunBacktest = document.getElementById("btn-run-backtest");
@@ -312,32 +331,63 @@ function bindListeners() {
     tabHistoryBtn.classList.add("active");
     tabH2hBtn.classList.remove("active");
     tabBacktestBtn.classList.remove("active");
+    tabLoggedBtn.classList.remove("active");
     tabHistoryContent.classList.remove("hidden");
     tabH2hContent.classList.add("hidden");
     tabBacktestContent.classList.add("hidden");
+    tabLoggedContent.classList.add("hidden");
   });
 
   tabH2hBtn.addEventListener("click", () => {
     tabH2hBtn.classList.add("active");
     tabHistoryBtn.classList.remove("active");
     tabBacktestBtn.classList.remove("active");
+    tabLoggedBtn.classList.remove("active");
     tabH2hContent.classList.remove("hidden");
     tabHistoryContent.classList.add("hidden");
     tabBacktestContent.classList.add("hidden");
+    tabLoggedContent.classList.add("hidden");
   });
 
   tabBacktestBtn.addEventListener("click", () => {
     tabBacktestBtn.classList.add("active");
     tabHistoryBtn.classList.remove("active");
     tabH2hBtn.classList.remove("active");
+    tabLoggedBtn.classList.remove("active");
     tabBacktestContent.classList.remove("hidden");
     tabHistoryContent.classList.add("hidden");
     tabH2hContent.classList.add("hidden");
+    tabLoggedContent.classList.add("hidden");
+  });
+
+  tabLoggedBtn.addEventListener("click", () => {
+    tabLoggedBtn.classList.add("active");
+    tabHistoryBtn.classList.remove("active");
+    tabH2hBtn.classList.remove("active");
+    tabBacktestBtn.classList.remove("active");
+    tabLoggedContent.classList.remove("hidden");
+    tabHistoryContent.classList.add("hidden");
+    tabH2hContent.classList.add("hidden");
+    tabBacktestContent.classList.add("hidden");
+    loadLoggedPicks();
   });
 
   btnRunBacktest.addEventListener("click", () => {
     runBacktestFlow();
   });
+
+  btnLogPick.addEventListener("click", () => {
+    logCurrentPick();
+  });
+
+  btnUpdateLogged.addEventListener("click", () => {
+    updateLoggedPicksResults();
+  });
+
+  // Dynamic refresh on overrides/altitude change
+  inputOverrideA.addEventListener("change", () => { runPredictionFlow(); });
+  inputOverrideB.addEventListener("change", () => { runPredictionFlow(); });
+  inputAltitude.addEventListener("change", () => { runPredictionFlow(); });
 }
 
 function updateMatchCard(fullReload = true) {
@@ -679,7 +729,10 @@ async function runPredictionFlow() {
     numSims: parseInt(simsSlider.value),
     oddsA: inputOddsA.value ? parseFloat(inputOddsA.value) : null,
     oddsDraw: inputOddsDraw.value ? parseFloat(inputOddsDraw.value) : null,
-    oddsB: inputOddsB.value ? parseFloat(inputOddsB.value) : null
+    oddsB: inputOddsB.value ? parseFloat(inputOddsB.value) : null,
+    strengthOverrideA: inputOverrideA.value ? parseFloat(inputOverrideA.value) : 1.0,
+    strengthOverrideB: inputOverrideB.value ? parseFloat(inputOverrideB.value) : 1.0,
+    altitude: inputAltitude.value ? parseInt(inputAltitude.value) : 0
   };
 
   try {
@@ -689,6 +742,7 @@ async function runPredictionFlow() {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
+    lastSimulationResult = data; // Save globally for logging (Fase 6)
 
     // Render results
     const pctA = (data.probWinA * 100).toFixed(1);
@@ -994,6 +1048,210 @@ function renderBacktestMetrics(data) {
   btDate.textContent = d.toLocaleString();
 }
 
+
+
+/* ==========================================================================
+   LOGGED PICKS FLOW (FASE 6)
+   ========================================================================== */
+async function logCurrentPick() {
+  if (!lastSimulationResult) {
+    alert("Primero debes realizar una simulación ejecutando el botón 🚀 SIMULAR.");
+    return;
+  }
+
+  btnLogPick.disabled = true;
+  logPickSpinner.classList.remove("hidden");
+  btnLogPick.querySelector(".btn-text").textContent = "GUARDANDO...";
+
+  const payload = {
+    teamA: selectedTeamA,
+    teamB: selectedTeamB,
+    probWinA: lastSimulationResult.probWinA,
+    probDraw: lastSimulationResult.probDraw,
+    probWinB: lastSimulationResult.probWinB,
+    xgA: lastSimulationResult.xgA,
+    xgB: lastSimulationResult.xgB,
+    strengthOverrideA: inputOverrideA.value ? parseFloat(inputOverrideA.value) : 1.0,
+    strengthOverrideB: inputOverrideB.value ? parseFloat(inputOverrideB.value) : 1.0,
+    altitude: inputAltitude.value ? parseInt(inputAltitude.value) : 0
+  };
+
+  try {
+    const res = await fetch("/api/log-prediction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      alert("✅ Pick guardado exitosamente en el historial.");
+    } else {
+      alert("Error al guardar pick: " + json.detail);
+    }
+  } catch (error) {
+    console.error("Error logging pick:", error);
+    alert("Error de red al guardar pick.");
+  } finally {
+    btnLogPick.disabled = false;
+    logPickSpinner.classList.add("hidden");
+    btnLogPick.querySelector(".btn-text").textContent = "📥 GUARDAR PICK";
+  }
+}
+
+async function loadLoggedPicks() {
+  loggedMatchList.innerHTML = `<div class="loading-placeholder">Cargando picks...</div>`;
+  try {
+    const res = await fetch("/api/logged-predictions");
+    const json = await res.json();
+    renderLoggedPicks(json.predictions);
+  } catch (error) {
+    console.error("Error loading logged picks:", error);
+    loggedMatchList.innerHTML = `<div class="loading-placeholder">Error al cargar picks.</div>`;
+  }
+}
+
+async function updateLoggedPicksResults() {
+  btnUpdateLogged.disabled = true;
+  loggedUpdateSpinner.classList.remove("hidden");
+  btnUpdateLogged.querySelector(".btn-text").textContent = "ACTUALIZANDO...";
+
+  try {
+    const res = await fetch("/api/update-prediction-results", { method: "POST" });
+    const json = await res.json();
+    if (json.status === "success") {
+      renderLoggedPicks(json.predictions, json.summary);
+    } else {
+      alert("Error al actualizar: " + json.detail);
+    }
+  } catch (error) {
+    console.error("Error updating logged results:", error);
+    alert("Error al conectar con la API de actualización.");
+  } finally {
+    btnUpdateLogged.disabled = false;
+    loggedUpdateSpinner.classList.add("hidden");
+    btnUpdateLogged.querySelector(".btn-text").textContent = "🔄 ACTUALIZAR RESULTADOS";
+  }
+}
+
+function renderLoggedPicks(predictions, summary = null) {
+  loggedMatchList.innerHTML = "";
+
+  if (!predictions || predictions.length === 0) {
+    loggedMatchList.innerHTML = `<div class="loading-placeholder">No hay picks registrados aún. Guarda un pick usando el botón "Guardar Pick" en el panel de simulación.</div>`;
+    loggedSummaryContainer.classList.add("hidden");
+    return;
+  }
+
+  // Handle summary rendering
+  if (summary) {
+    loggedSummaryContainer.classList.remove("hidden");
+    loggedAccuracy.textContent = `${summary.accuracyPercent}%`;
+    loggedRps.textContent = summary.avgRps.toFixed(4);
+    loggedTotalCount.textContent = summary.totalLogged;
+    loggedCompletedCount.textContent = summary.totalCompleted;
+  } else {
+    // Try to compute simple summary if not provided
+    const completed = predictions.filter(p => p.status === "completed");
+    if (completed.length > 0) {
+      loggedSummaryContainer.classList.remove("hidden");
+      const correct = completed.filter(p => p.isCorrect).length;
+      const accVal = (correct / completed.length * 100).toFixed(1);
+      const rpsSum = completed.reduce((sum, p) => sum + (p.rps || 0), 0);
+      const avgRpsVal = rpsSum / completed.length;
+      
+      loggedAccuracy.textContent = `${accVal}%`;
+      loggedRps.textContent = avgRpsVal.toFixed(4);
+      loggedTotalCount.textContent = predictions.length;
+      loggedCompletedCount.textContent = completed.length;
+    } else {
+      loggedSummaryContainer.classList.add("hidden");
+    }
+  }
+
+  predictions.forEach(p => {
+    const metaA = TEAM_METADATA[p.teamA] || { name: p.teamA.toUpperCase(), flag: "🏳️" };
+    const metaB = TEAM_METADATA[p.teamB] || { name: p.teamB.toUpperCase(), flag: "🏳️" };
+
+    const card = document.createElement("div");
+    
+    let outcomeClass = "match-outcome-draw";
+    let statusText = "Pendiente";
+    let statusColor = "var(--color-text-secondary)";
+    
+    if (p.status === "completed") {
+      outcomeClass = p.isCorrect ? "match-outcome-win" : "match-outcome-loss";
+      statusText = `${p.isCorrect ? '✅ Acierto' : '❌ Fallo'} (Pick: ${p.pick === 'A' ? metaA.name.slice(0,6) : p.pick === 'B' ? metaB.name.slice(0,6) : 'Emp.'} / Real: ${p.actualScore})`;
+      statusColor = p.isCorrect ? "#10b981" : "#ef4444";
+    }
+
+    const d = new Date(p.timestamp);
+    const dateStr = d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    card.className = `match-card ${outcomeClass}`;
+    card.style.flexDirection = "column";
+    card.style.alignItems = "stretch";
+    card.style.gap = "6px";
+    card.style.padding = "12px";
+
+    let actionButtonsHtml = "";
+    if (p.status === "pending") {
+      actionButtonsHtml = `
+        <div style="display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px;">
+          <button class="btn btn-resolve-win" data-id="${p.id}" style="padding: 4px 10px; font-size: 0.75rem; background: #059669; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: 600; transition: opacity 0.2s;">✅ GANADO</button>
+          <button class="btn btn-resolve-loss" data-id="${p.id}" style="padding: 4px 10px; font-size: 0.75rem; background: #dc2626; border: none; border-radius: 4px; color: white; cursor: pointer; font-weight: 600; transition: opacity 0.2s;">❌ PERDIDO</button>
+        </div>
+      `;
+    }
+
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+        <span>${dateStr}</span>
+        <span style="font-weight: 600; color: ${statusColor};">${statusText}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+        <span style="font-weight: 600; font-size: 0.95rem;">${metaA.flag} ${metaA.name} vs ${metaB.flag} ${metaB.name}</span>
+        <span class="badge" style="font-size: 0.8rem; background: rgba(255,255,255,0.06);">${p.xgA.toFixed(1)} - ${p.xgB.toFixed(1)} xG</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--color-text-secondary); margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.03);">
+        <span>Probs: ${metaA.name.slice(0,5)} ${(p.probWinA*100).toFixed(0)}% / Emp ${(p.probDraw*100).toFixed(0)}% / ${metaB.name.slice(0,5)} ${(p.probWinB*100).toFixed(0)}%</span>
+        ${p.altitude > 0 ? `<span style="font-size: 0.75rem; color: #a5b4fc;">🏔️ ${p.altitude}m</span>` : ''}
+      </div>
+      ${actionButtonsHtml}
+    `;
+
+    loggedMatchList.appendChild(card);
+  });
+}
+
+async function resolvePick(id, isCorrect) {
+  try {
+    const res = await fetch("/api/resolve-prediction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, isCorrect })
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      renderLoggedPicks(json.predictions, json.summary);
+    } else {
+      alert("Error al resolver el pick: " + json.detail);
+    }
+  } catch (error) {
+    console.error("Error resolving pick:", error);
+    alert("Error de red al resolver el pick.");
+  }
+}
+
+// Event delegation for resolve buttons
+document.getElementById("logged-match-list").addEventListener("click", async function(e) {
+  if (e.target && e.target.classList.contains("btn-resolve-win")) {
+    const id = parseInt(e.target.dataset.id);
+    await resolvePick(id, true);
+  } else if (e.target && e.target.classList.contains("btn-resolve-loss")) {
+    const id = parseInt(e.target.dataset.id);
+    await resolvePick(id, false);
+  }
+});
 
 
 // Start the app on load
