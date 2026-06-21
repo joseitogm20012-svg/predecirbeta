@@ -74,6 +74,7 @@ let selectedTeamA = "uruguay";
 let selectedTeamB = "saudi-arabia";
 let goalsChart = null;
 let outcomeChart = null;
+let radarChart = null;
 let lastSimulationResult = null; // Global to store the latest simulation result for logging (Fase 6)
 
 // DOM Elements
@@ -378,6 +379,49 @@ function bindListeners() {
       runPredictionFlow();
     }
   });
+
+  // Collapsible Parameter Guide Panel Toggle
+  const btnToggleGuide = document.getElementById("btn-toggle-guide");
+  const configGuideContent = document.getElementById("config-guide-content");
+  const configGuideContainer = document.querySelector(".config-guide-container");
+  
+  if (btnToggleGuide && configGuideContent && configGuideContainer) {
+    btnToggleGuide.addEventListener("click", () => {
+      configGuideContainer.classList.toggle("expanded");
+      configGuideContent.classList.toggle("expanded");
+      
+      const spanText = btnToggleGuide.querySelector("span");
+      if (spanText) {
+        if (configGuideContainer.classList.contains("expanded")) {
+          spanText.textContent = "Ocultar Guía Explicativa de Parámetros";
+        } else {
+          spanText.textContent = "Ver Guía Explicativa de Parámetros";
+        }
+      }
+    });
+  }
+
+  // Exact Scores view toggle (List vs 5x5 Heatmap Grid)
+  const btnShowList = document.getElementById("btn-show-list");
+  const btnShowHeatmap = document.getElementById("btn-show-heatmap");
+  const scoreListContainer = document.getElementById("score-list-container");
+  const scoreHeatmapContainer = document.getElementById("score-heatmap-container");
+
+  if (btnShowList && btnShowHeatmap && scoreListContainer && scoreHeatmapContainer) {
+    btnShowList.addEventListener("click", () => {
+      btnShowList.classList.add("active");
+      btnShowHeatmap.classList.remove("active");
+      scoreListContainer.classList.remove("hidden");
+      scoreHeatmapContainer.classList.add("hidden");
+    });
+
+    btnShowHeatmap.addEventListener("click", () => {
+      btnShowHeatmap.classList.add("active");
+      btnShowList.classList.remove("active");
+      scoreListContainer.classList.add("hidden");
+      scoreHeatmapContainer.classList.remove("hidden");
+    });
+  }
 }
 
 function updateMatchCard(fullReload = true) {
@@ -562,7 +606,94 @@ function getPoissonDistribution(lambda) {
   return dist;
 }
 
-function updateCharts(nameAVal, nameBVal, xgAVal, xgBVal, winA, draw, winB) {
+function renderScoreHeatmap(heatmapData, nameA, nameB) {
+  const tbody = document.getElementById("heatmap-tbody");
+  const table = tbody ? tbody.closest("table") : null;
+  if (!tbody || !table) return;
+
+  // Generate table header
+  let theadHTML = `
+    <tr>
+      <th style="padding: 10px; border-bottom: 2px solid var(--panel-border); color: var(--color-text-secondary); width: 80px;">${nameA.slice(0, 3)} \\ ${nameB.slice(0, 3)}</th>
+      <th style="padding: 10px; border-bottom: 2px solid var(--panel-border); font-family: var(--font-family-title); color: var(--color-team-b);">0</th>
+      <th style="padding: 10px; border-bottom: 2px solid var(--panel-border); font-family: var(--font-family-title); color: var(--color-team-b);">1</th>
+      <th style="padding: 10px; border-bottom: 2px solid var(--panel-border); font-family: var(--font-family-title); color: var(--color-team-b);">2</th>
+      <th style="padding: 10px; border-bottom: 2px solid var(--panel-border); font-family: var(--font-family-title); color: var(--color-team-b);">3</th>
+      <th style="padding: 10px; border-bottom: 2px solid var(--panel-border); font-family: var(--font-family-title); color: var(--color-team-b);">4</th>
+    </tr>
+  `;
+  const thead = table.querySelector("thead");
+  if (thead) thead.innerHTML = theadHTML;
+
+  // Populate tbody
+  tbody.innerHTML = "";
+  for (let a = 0; a < 5; a++) {
+    const tr = document.createElement("tr");
+    
+    // Row header (Home Goals)
+    let trHTML = `<td style="padding: 10px; font-weight: 700; border-right: 2px solid var(--panel-border); color: var(--color-team-a); font-family: var(--font-family-title);">${a}</td>`;
+    
+    for (let b = 0; b < 5; b++) {
+      const prob = heatmapData[a][b];
+      const probPct = (prob * 100).toFixed(1);
+      
+      // Determine background color intensity and borders based on probability
+      let bgStyle = "";
+      let textStyle = "color: var(--color-text-secondary);";
+      
+      if (prob >= 0.08) {
+        // High probability (gold)
+        bgStyle = "background: rgba(240, 179, 16, 0.85); border: 1px solid rgba(240, 179, 16, 0.95);";
+        textStyle = "color: #111827; font-weight: 700;";
+      } else if (prob >= 0.03) {
+        // Medium probability (mid-gold translucent)
+        bgStyle = "background: rgba(240, 179, 16, 0.45); border: 1px solid rgba(240, 179, 16, 0.55);";
+        textStyle = "color: var(--color-text-primary); font-weight: 700;";
+      } else {
+        // Low probability
+        bgStyle = "background: rgba(240, 179, 16, 0.05); border: 1px solid rgba(255, 255, 255, 0.02);";
+        textStyle = "color: var(--color-text-secondary);";
+      }
+      
+      trHTML += `
+        <td style="padding: 12px 10px; font-family: var(--font-family-mono); transition: all 0.2s; ${bgStyle} ${textStyle}">
+          ${probPct}%
+        </td>
+      `;
+    }
+    
+    tr.innerHTML = trHTML;
+    tbody.appendChild(tr);
+  }
+}
+
+function updateSideBySideBar(metricValA, metricValB, idValA, idBarA, idValB, idBarB, decimals = 2) {
+  const elValA = document.getElementById(idValA);
+  const elBarA = document.getElementById(idBarA);
+  const elValB = document.getElementById(idValB);
+  const elBarB = document.getElementById(idBarB);
+  
+  if (!elValA || !elBarA || !elValB || !elBarB) return;
+  
+  const valA = parseFloat(metricValA || 0);
+  const valB = parseFloat(metricValB || 0);
+  
+  elValA.textContent = valA.toFixed(decimals);
+  elValB.textContent = valB.toFixed(decimals);
+  
+  const total = valA + valB;
+  if (total > 0) {
+    const pctA = (valA / total) * 100;
+    const pctB = (valB / total) * 100;
+    elBarA.style.width = `${pctA}%`;
+    elBarB.style.width = `${pctB}%`;
+  } else {
+    elBarA.style.width = "0%";
+    elBarB.style.width = "0%";
+  }
+}
+
+function updateCharts(nameAVal, nameBVal, xgAVal, xgBVal, winA, draw, winB, fullData = null) {
   const distA = getPoissonDistribution(xgAVal);
   const distB = getPoissonDistribution(xgBVal);
 
@@ -698,6 +829,141 @@ function updateCharts(nameAVal, nameBVal, xgAVal, xgBVal, winA, draw, winB) {
           }
         }
       });
+    }
+  }
+
+  // Update/Render Radar Comparison Chart (Hexagon)
+  if (fullData && fullData.comparisonStats) {
+    const statsA = fullData.comparisonStats.teamA;
+    const statsB = fullData.comparisonStats.teamB;
+
+    // Normalizations for Radar (0-100)
+    // 1. Attack (xg_overall normalized, 3.0 = 100)
+    const attackA = Math.min(100, Math.max(0, (statsA.xg_overall / 3.0) * 100));
+    const attackB = Math.min(100, Math.max(0, (statsB.xg_overall / 3.0) * 100));
+
+    // 2. Defense (xga_overall normalized, 3.0 = 0, 0.0 = 100)
+    const defenseA = Math.min(100, Math.max(0, ((3.0 - statsA.xga_overall) / 3.0) * 100));
+    const defenseB = Math.min(100, Math.max(0, ((3.0 - statsB.xga_overall) / 3.0) * 100));
+
+    // 3. Form (gs and gc combined, gs - gc from -2.0 to 2.0 mapped to 0 to 100)
+    const formDiffA = statsA.form_gs - statsA.form_gc;
+    const formDiffB = statsB.form_gs - statsB.form_gc;
+    const formA = Math.min(100, Math.max(0, (formDiffA + 2.0) * 25));
+    const formB = Math.min(100, Math.max(0, (formDiffB + 2.0) * 25));
+
+    // 4. H2H (Direct matchup win rate)
+    const wA = parseInt(h2hWinsA.textContent) || 0;
+    const wB = parseInt(h2hWinsB.textContent) || 0;
+    const dr = parseInt(h2hDraws.textContent) || 0;
+    const totalMatches = wA + wB + dr;
+    let h2hA = 50;
+    let h2hB = 50;
+    if (totalMatches > 0) {
+      h2hA = Math.round(((wA + 0.5 * dr) / totalMatches) * 100);
+      h2hB = Math.round(((wB + 0.5 * dr) / totalMatches) * 100);
+    }
+
+    // 5. Prestige / ELO (1300 ELO = 0, 2200 ELO = 100)
+    const eloScoreA = Math.min(100, Math.max(0, ((statsA.elo - 1300) / 900) * 100));
+    const eloScoreB = Math.min(100, Math.max(0, ((statsB.elo - 1300) / 900) * 100));
+
+    // 6. Match xG (xg_a projected by model normalized, 3.0 = 100)
+    const matchXgScoreA = Math.min(100, Math.max(0, (statsA.match_xg / 3.0) * 100));
+    const matchXgScoreB = Math.min(100, Math.max(0, (statsB.match_xg / 3.0) * 100));
+
+    const radarDataA = [attackA, defenseA, formA, h2hA, eloScoreA, matchXgScoreA];
+    const radarDataB = [attackB, defenseB, formB, h2hB, eloScoreB, matchXgScoreB];
+
+    if (radarChart) {
+      radarChart.data.datasets[0].label = nameAVal;
+      radarChart.data.datasets[0].data = radarDataA;
+      radarChart.data.datasets[1].label = nameBVal;
+      radarChart.data.datasets[1].data = radarDataB;
+      radarChart.update();
+    } else {
+      const ctx = document.getElementById('radarComparisonChart');
+      if (ctx) {
+        radarChart = new Chart(ctx.getContext('2d'), {
+          type: 'radar',
+          data: {
+            labels: ['Ataque', 'Defensa', 'Forma', 'Historial H2H', 'Prestigio (Elo)', 'xG Directo'],
+            datasets: [
+              {
+                label: nameAVal,
+                data: radarDataA,
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(59, 130, 246, 1)'
+              },
+              {
+                label: nameBVal,
+                data: radarDataB,
+                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                borderColor: 'rgba(16, 185, 129, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(16, 185, 129, 1)'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+              padding: 15
+            },
+            plugins: {
+              legend: {
+                labels: {
+                  color: '#fff',
+                  font: { family: 'Inter', size: 10 }
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 22, 42, 0.9)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderWidth: 1,
+                callbacks: {
+                  label: function(context) {
+                    return ` ${context.dataset.label}: ${Math.round(context.raw)}/100`;
+                  }
+                }
+              }
+            },
+            scales: {
+              r: {
+                angleLines: {
+                  color: 'rgba(255, 255, 255, 0.08)'
+                },
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.08)'
+                },
+                pointLabels: {
+                  color: '#9ca3af',
+                  font: { family: 'Outfit', size: 9, weight: '600' }
+                },
+                ticks: {
+                  color: '#6b7280',
+                  backdropColor: 'transparent',
+                  font: { size: 8 },
+                  stepSize: 20
+                },
+                min: 0,
+                max: 100
+              }
+            }
+          }
+        });
+      }
     }
   }
 }
@@ -976,8 +1242,25 @@ async function runPredictionFlow() {
       oddsAnalysisContainer.classList.add("hidden");
     }
 
-    // Update analytical charts
-    updateCharts(nameAVal, nameBVal, data.xgA, data.xgB, data.probWinA, data.probDraw, data.probWinB);
+    // Render score heatmap matrix
+    if (data.scoreHeatmap) {
+      renderScoreHeatmap(data.scoreHeatmap, nameAVal, nameBVal);
+    }
+
+    // Render side-by-side comparative bars
+    if (data.comparisonStats) {
+      const statsA = data.comparisonStats.teamA;
+      const statsB = data.comparisonStats.teamB;
+      
+      updateSideBySideBar(statsA.match_xg, statsB.match_xg, "comp-val-a-xg", "comp-bar-fill-a-xg", "comp-val-b-xg", "comp-bar-fill-b-xg", 2);
+      updateSideBySideBar(statsA.xg_overall, statsB.xg_overall, "comp-val-a-xghist", "comp-bar-fill-a-xghist", "comp-val-b-xghist", "comp-bar-fill-b-xghist", 2);
+      updateSideBySideBar(statsA.shots_per_90, statsB.shots_per_90, "comp-val-a-shots", "comp-bar-fill-a-shots", "comp-val-b-shots", "comp-bar-fill-b-shots", 1);
+      updateSideBySideBar(statsA.crosses_per_90, statsB.crosses_per_90, "comp-val-a-crosses", "comp-bar-fill-a-crosses", "comp-val-b-crosses", "comp-bar-fill-b-crosses", 1);
+      updateSideBySideBar(data.cornersPrediction.expectedA, data.cornersPrediction.expectedB, "comp-val-a-corners", "comp-bar-fill-a-corners", "comp-val-b-corners", "comp-bar-fill-b-corners", 1);
+    }
+
+    // Update analytical charts (including the radar chart)
+    updateCharts(nameAVal, nameBVal, data.xgA, data.xgB, data.probWinA, data.probDraw, data.probWinB, data);
 
   } catch (error) {
     console.error("Prediction API error:", error);
