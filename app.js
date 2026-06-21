@@ -473,6 +473,31 @@ function updateMatchCard(fullReload = true) {
   evLabelA.textContent = `${metaA.name.slice(0, 5)}. EV%`;
   evLabelB.textContent = `${metaB.name.slice(0, 5)}. EV%`;
 
+  // Update DNB placeholders
+  const inDnb1 = document.getElementById("in-dnb-1");
+  const inDnb2 = document.getElementById("in-dnb-2");
+  if (inDnb1) inDnb1.placeholder = `${metaA.name.slice(0, 8)} DNB`;
+  if (inDnb2) inDnb2.placeholder = `${metaB.name.slice(0, 8)} DNB`;
+
+  // Update Asian Handicap placeholders
+  const inAhM15a = document.getElementById("in-ah-m15-a");
+  const inAhM15b = document.getElementById("in-ah-m15-b");
+  const inAhM05a = document.getElementById("in-ah-m05-a");
+  const inAhM05b = document.getElementById("in-ah-m05-b");
+  const inAhP05a = document.getElementById("in-ah-p05-a");
+  const inAhP05b = document.getElementById("in-ah-p05-b");
+  const inAhP15a = document.getElementById("in-ah-p15-a");
+  const inAhP15b = document.getElementById("in-ah-p15-b");
+
+  if (inAhM15a) inAhM15a.placeholder = `${metaA.name.slice(0, 8)} -1.5`;
+  if (inAhM15b) inAhM15b.placeholder = `${metaB.name.slice(0, 8)} +1.5`;
+  if (inAhM05a) inAhM05a.placeholder = `${metaA.name.slice(0, 8)} -0.5`;
+  if (inAhM05b) inAhM05b.placeholder = `${metaB.name.slice(0, 8)} +0.5`;
+  if (inAhP05a) inAhP05a.placeholder = `${metaA.name.slice(0, 8)} +0.5`;
+  if (inAhP05b) inAhP05b.placeholder = `${metaB.name.slice(0, 8)} -0.5`;
+  if (inAhP15a) inAhP15a.placeholder = `${metaA.name.slice(0, 8)} +1.5`;
+  if (inAhP15b) inAhP15b.placeholder = `${metaB.name.slice(0, 8)} -1.5`;
+
   if (fullReload) {
     // Reload recent matches lists and H2H calculations from Python API
     loadRecentMatches(selectedTeamA, matchListA, historyTitleA, "Uruguay");
@@ -1225,6 +1250,7 @@ async function runPredictionFlow() {
       ahTbody.innerHTML = "";
 
       const ahLinesData = [
+        // 1.5 Goals Line
         {
           label: `${nameAVal} -1.5`,
           probYes: data.goalsMarkets.asianHandicap["-1.5"].teamA,
@@ -1233,6 +1259,15 @@ async function runPredictionFlow() {
           tStrNo: "m15-b",
           idYes: "in-ah-m15-a",
           idNo: "in-ah-m15-b"
+        },
+        {
+          label: `${nameBVal} +1.5`,
+          probYes: data.goalsMarkets.asianHandicap["-1.5"].teamB,
+          probNo: data.goalsMarkets.asianHandicap["-1.5"].teamA,
+          tStrYes: "m15-b",
+          tStrNo: "m15-a",
+          idYes: "in-ah-m15-b",
+          idNo: "in-ah-m15-a"
         },
         {
           label: `${nameBVal} -1.5`,
@@ -1244,6 +1279,16 @@ async function runPredictionFlow() {
           idNo: "in-ah-p15-a"
         },
         {
+          label: `${nameAVal} +1.5`,
+          probYes: data.goalsMarkets.asianHandicap["+1.5"].teamA,
+          probNo: data.goalsMarkets.asianHandicap["+1.5"].teamB,
+          tStrYes: "p15-a",
+          tStrNo: "p15-b",
+          idYes: "in-ah-p15-a",
+          idNo: "in-ah-p15-b"
+        },
+        // 0.5 Goals Line
+        {
           label: `${nameAVal} -0.5`,
           probYes: data.goalsMarkets.asianHandicap["-0.5"].teamA,
           probNo: data.goalsMarkets.asianHandicap["-0.5"].teamB,
@@ -1253,6 +1298,15 @@ async function runPredictionFlow() {
           idNo: "in-ah-m05-b"
         },
         {
+          label: `${nameBVal} +0.5`,
+          probYes: data.goalsMarkets.asianHandicap["-0.5"].teamB,
+          probNo: data.goalsMarkets.asianHandicap["-0.5"].teamA,
+          tStrYes: "m05-b",
+          tStrNo: "m05-a",
+          idYes: "in-ah-m05-b",
+          idNo: "in-ah-m05-a"
+        },
+        {
           label: `${nameBVal} -0.5`,
           probYes: data.goalsMarkets.asianHandicap["+0.5"].teamB,
           probNo: data.goalsMarkets.asianHandicap["+0.5"].teamA,
@@ -1260,6 +1314,15 @@ async function runPredictionFlow() {
           tStrNo: "p05-a",
           idYes: "in-ah-p05-b",
           idNo: "in-ah-p05-a"
+        },
+        {
+          label: `${nameAVal} +0.5`,
+          probYes: data.goalsMarkets.asianHandicap["+0.5"].teamA,
+          probNo: data.goalsMarkets.asianHandicap["+0.5"].teamB,
+          tStrYes: "p05-a",
+          tStrNo: "p05-b",
+          idYes: "in-ah-p05-a",
+          idNo: "in-ah-p05-b"
         }
       ];
 
@@ -1698,9 +1761,9 @@ document.addEventListener('input', function(e) {
     const targetId = e.target.dataset.target;
     if (!targetId) return;
     
-    const evSpan = document.getElementById(targetId);
+    const evSpans = document.querySelectorAll(`[id="${targetId}"]`);
     
-    if (evSpan) {
+    evSpans.forEach(evSpan => {
       if (!isNaN(prob) && !isNaN(odds) && odds > 1.0) {
         const ev = (prob * odds) - 1;
         const evPct = (ev * 100).toFixed(1);
@@ -1715,6 +1778,6 @@ document.addEventListener('input', function(e) {
         evSpan.textContent = '';
         evSpan.className = 'ev-mini';
       }
-    }
+    });
   }
 });
