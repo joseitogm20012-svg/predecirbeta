@@ -1243,8 +1243,6 @@ async function resolvePick(id, isCorrect) {
 }
 
 // Event delegation for resolve buttons
-const loggedMatchList = document.getElementById("logged-match-list");
-
 if (loggedMatchList) {
   loggedMatchList.addEventListener("click", async function(e) {
     if (e.target && e.target.classList.contains("btn-resolve-win")) {

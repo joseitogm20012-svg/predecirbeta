@@ -1,1 +1,13 @@
-Nothing needs to be added to .gitignore since the changes only include source code files (.py) and a data file (.json), which should be tracked in version control.
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+node_modules/
+dist/
+.DS_Store
+vectorized (2).svg
+*.bak
+scratch/
+downloaded_files/
