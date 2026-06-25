@@ -1,0 +1,26 @@
+IDEAS PARA DAR VALOR A LAS CUENTAS DE USUARIO Y MODELO FREEMIUM
+================================================================
+
+1. Guardado y Personalización (Aportan valor inmediato)
+-------------------------------------------------------
+* Historial y Favoritos: Permitir a los usuarios guardar partidos específicos como "Favoritos" para hacerles seguimiento, o guardar sus simulaciones pasadas para ver cómo les fue en sus pronósticos.
+* Presets (Modelos Propios): El simulador tiene varios parámetros (Ponderación FIFA, H2H, Altitud). Cada usuario podría guardar sus propias configuraciones (ej. "Mi Modelo Conservador" o "Modelo Ofensivo") y cargarlas con un solo clic.
+* Notas Privadas: Habilitar un cuadro de texto en cada partido analizado para que el usuario guarde sus propios apuntes tácticos o registre cuánto dinero planea apostar.
+*Encuestas antes del partido.
+2. Gamificación y Comunidad (Para retener usuarios)
+---------------------------------------------------
+* Ranking de Pronosticadores (Leaderboard): Permitir que el usuario haga su propio pronóstico antes del partido. Luego, crear un Ranking global donde se compare quién acierta más a lo largo del torneo: ¿Los usuarios o el modelo de Inteligencia Artificial? Esto genera mucha interacción.
+
+3. La Base del Modelo Freemium (Gratis vs Premium)
+--------------------------------------------------
+* Límites Diarios:
+  - Gratis: Tienen un límite de 2 a 3 simulaciones o análisis de IA al día.
+  - Premium: Simulaciones ilimitadas en cualquier momento.
+* Datos Ocultos y Especiales (Value Bets):
+  - Gratis: Solo pueden ver quién tiene mayor probabilidad de ganar y los porcentajes básicos.
+  - Premium: Desbloquean métricas avanzadas (como "Valor de Apuesta" comparando con cuotas de casas de apuestas reales), detalles de goles esperados (xG) y el reporte completo de la Inteligencia Artificial.
+* Alertas Inteligentes (Premium): Los usuarios de pago podrían configurar alertas personalizadas. Por ejemplo: "Envíame un correo cuando el modelo encuentre una predicción con más del 70% de probabilidad de victoria para un equipo visitante".
+
+----------------------------------------------------------------
+Siguiente paso a programar (Mañana): 
+- Implementar integración de Login con GitHub.

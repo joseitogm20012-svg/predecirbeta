@@ -9,7 +9,17 @@ import json
 import subprocess
 from datetime import datetime
 
+# Cargar variables de entorno desde el archivo .env si existe (útil para desarrollo local)
+if os.path.exists(".env"):
+    with open(".env", "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, val = line.split("=", 1)
+                os.environ[key.strip()] = val.strip().strip('"').strip("'")
+
 from predictor import load_data, run_prediction_sim, get_team_history, get_h2h_stats
+import db
 
 app = FastAPI(
     title="Predictor Mundial 2026 API",
@@ -192,6 +202,7 @@ def get_logged_predictions():
 class ResolvePredictionRequest(BaseModel):
     id: int
     isCorrect: bool
+    actualResult: Optional[str] = None
 
 @app.post("/api/resolve-prediction")
 def resolve_prediction(req: ResolvePredictionRequest):
@@ -206,10 +217,23 @@ def resolve_prediction(req: ResolvePredictionRequest):
             if p["id"] == req.id:
                 p["status"] = "completed"
                 p["isCorrect"] = req.isCorrect
-                p["actualResult"] = "Manual"
+                
+                # Determine actual outcome
+                probs = [p["probWinA"], p["probDraw"], p["probWinB"]]
+                max_idx = probs.index(max(probs))
+                pick = "A" if max_idx == 0 else "Draw" if max_idx == 1 else "B"
+                
+                actual_val = req.actualResult
+                if not actual_val:
+                    actual_val = pick if req.isCorrect else ("B" if pick == "A" else "A")
+                
+                p["actualResult"] = actual_val
                 p["actualScore"] = "Manual"
                 p["rps"] = 0.0 if req.isCorrect else 1.0
                 found = True
+                
+                # Resolve in user SQLite db
+                db.resolve_user_pronostics(p["teamA"], p["teamB"], actual_val)
                 break
         
         if not found:
@@ -306,6 +330,9 @@ def update_prediction_results():
                         p["status"] = "completed"
                         updated_count += 1
                         
+                        # Resolve user official pronostics
+                        db.resolve_user_pronostics(team_a, team_b, actual)
+                        
             if p["status"] == "completed":
                 total_completed += 1
                 
@@ -372,6 +399,10 @@ class AIAnalysisRequest(BaseModel):
     modelName: str
     stage: Optional[str] = "Fase de Grupos"
     keyPlayers: Optional[str] = ""
+    oddsA: Optional[float] = None
+    oddsDraw: Optional[float] = None
+    oddsB: Optional[float] = None
+    odds: Optional[dict] = None
 
 @app.post("/api/ai-auth/verify")
 def verify_auth(req: VerifyAuthRequest):
@@ -434,7 +465,7 @@ def save_ai_analysis(req: AIAnalysisRequest, x_admin_password: Optional[str] = H
                 if item.get("match_key") == match_key:
                     existing_item = item
                     break
-
+ 
         if existing_item:
             existing_item["teamA"] = req.teamA
             existing_item["teamB"] = req.teamB
@@ -446,6 +477,10 @@ def save_ai_analysis(req: AIAnalysisRequest, x_admin_password: Optional[str] = H
             existing_item["model_name"] = req.modelName
             existing_item["stage"] = req.stage if req.stage else "Fase de Grupos"
             existing_item["key_players"] = req.keyPlayers if req.keyPlayers else ""
+            existing_item["odds_a"] = req.oddsA
+            existing_item["odds_draw"] = req.oddsDraw
+            existing_item["odds_b"] = req.oddsB
+            existing_item["odds"] = req.odds if req.odds else {}
             existing_item["updated_at"] = datetime.now().isoformat()
             saved_entry = existing_item
         else:
@@ -461,6 +496,10 @@ def save_ai_analysis(req: AIAnalysisRequest, x_admin_password: Optional[str] = H
                 "model_name": req.modelName,
                 "stage": req.stage if req.stage else "Fase de Grupos",
                 "key_players": req.keyPlayers if req.keyPlayers else "",
+                "odds_a": req.oddsA,
+                "odds_draw": req.oddsDraw,
+                "odds_b": req.oddsB,
+                "odds": req.odds if req.odds else {},
                 "created_at": datetime.now().isoformat()
             }
             analyses.insert(0, new_entry)
@@ -495,6 +534,300 @@ def delete_ai_analysis(analysis_id: int, x_admin_password: Optional[str] = Heade
         return {"status": "success", "message": "Analysis deleted successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================
+# SUPABASE JWT VERIFICATION (PREPARACIÓN PARA FUTURO FREEMIUM)
+# ============================================================
+import urllib.request
+import urllib.error
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://lquonmtzxpqrevpnciqt.supabase.co")
+SUPABASE_PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_drrEAs42IYsrGzujj9dsbw_bBvRANvL")
+
+def get_current_user_from_supabase(authorization: Optional[str] = Header(None)):
+    """
+    Helper para obtener el usuario autenticado desde Supabase.
+    Si se requiere verificar sesión en una ruta, se añade como dependencia de FastAPI.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="No token provided")
+    
+    token = authorization.split(" ")[1]
+    
+    req_url = f"{SUPABASE_URL}/auth/v1/user"
+    req = urllib.request.Request(req_url)
+    req.add_header("apikey", SUPABASE_PUBLISHABLE_KEY)
+    req.add_header("Authorization", f"Bearer {token}")
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            user_data = json.loads(response.read().decode("utf-8"))
+            return user_data
+    except urllib.error.HTTPError as e:
+        raise HTTPException(status_code=401, detail="Invalid token or session expired")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
+
+SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")
+
+class LookupUsernameRequest(BaseModel):
+    username: str
+
+@app.post("/api/lookup-username")
+def lookup_username(req: LookupUsernameRequest):
+    req_url = f"{SUPABASE_URL}/auth/v1/admin/users"
+    request = urllib.request.Request(req_url)
+    request.add_header("apikey", SUPABASE_SECRET_KEY)
+    request.add_header("Authorization", f"Bearer {SUPABASE_SECRET_KEY}")
+    
+    try:
+        with urllib.request.urlopen(request) as response:
+            users_data = json.loads(response.read().decode("utf-8"))
+            if isinstance(users_data, dict) and "users" in users_data:
+                users = users_data["users"]
+            else:
+                users = users_data
+                
+            for u in users:
+                if isinstance(u, dict):
+                    meta = u.get("user_metadata", {})
+                    if meta.get("username") == req.username or meta.get("display_name") == req.username:
+                        return {"status": "success", "email": u.get("email")}
+                        
+            return {"status": "not_found", "message": "Username not found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error looking up user: {str(e)}")
+
+# ============================================================
+# ADMIN USER MANAGEMENT
+# ============================================================
+class UpdateUserPlanRequest(BaseModel):
+    plan: str
+
+@app.get("/api/admin/users")
+def get_admin_users(x_admin_password: Optional[str] = Header(None)):
+    if not x_admin_password or x_admin_password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta o no autorizada")
+    
+    req_url = f"{SUPABASE_URL}/auth/v1/admin/users"
+    request = urllib.request.Request(req_url)
+    request.add_header("apikey", SUPABASE_SECRET_KEY)
+    request.add_header("Authorization", f"Bearer {SUPABASE_SECRET_KEY}")
+    
+    try:
+        with urllib.request.urlopen(request) as response:
+            users_data = json.loads(response.read().decode("utf-8"))
+            if isinstance(users_data, dict) and "users" in users_data:
+                users = users_data["users"]
+            else:
+                users = users_data
+            
+            result_users = []
+            for u in users:
+                if isinstance(u, dict):
+                    meta = u.get("user_metadata", {}) or {}
+                    result_users.append({
+                        "id": u.get("id"),
+                        "email": u.get("email"),
+                        "username": meta.get("username") or meta.get("display_name") or (u.get("email") or "").split("@")[0],
+                        "created_at": u.get("created_at"),
+                        "plan": (meta.get("plan") or "FREE").upper()
+                    })
+            return {"status": "success", "users": result_users}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing users: {str(e)}")
+
+@app.put("/api/admin/users/{user_id}/plan")
+def update_user_plan(user_id: str, req: UpdateUserPlanRequest, x_admin_password: Optional[str] = Header(None)):
+    if not x_admin_password or x_admin_password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta o no autorizada")
+    
+    req_url = f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+    
+    # 1. Fetch user to retrieve current metadata
+    get_request = urllib.request.Request(req_url)
+    get_request.add_header("apikey", SUPABASE_SECRET_KEY)
+    get_request.add_header("Authorization", f"Bearer {SUPABASE_SECRET_KEY}")
+    
+    current_meta = {}
+    try:
+        with urllib.request.urlopen(get_request) as response:
+            user_info = json.loads(response.read().decode("utf-8"))
+            current_meta = user_info.get("user_metadata", {}) or {}
+    except Exception as e:
+        pass
+    
+    # 2. Update plan in metadata
+    current_meta["plan"] = req.plan.upper()
+    
+    req_data = json.dumps({"user_metadata": current_meta}).encode("utf-8")
+    put_request = urllib.request.Request(req_url, data=req_data, method="PUT")
+    put_request.add_header("apikey", SUPABASE_SECRET_KEY)
+    put_request.add_header("Authorization", f"Bearer {SUPABASE_SECRET_KEY}")
+    put_request.add_header("Content-Type", "application/json")
+    
+    try:
+        with urllib.request.urlopen(put_request) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            return {"status": "success", "user": res_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating user plan: {str(e)}")
+
+# Pydantic models for user endpoints
+class FavoriteRequest(BaseModel):
+    teamA: str
+    teamB: str
+    xgA: float
+    xgB: float
+    probWinA: float
+    probDraw: float
+    probWinB: float
+    notes: Optional[str] = ""
+
+class PresetRequest(BaseModel):
+    presetName: str
+    fifaWeight: float
+    h2hWeight: float
+    decayMonths: float
+    strengthOverrideA: float
+    strengthOverrideB: float
+    altitude: int
+
+class VoteRequest(BaseModel):
+    teamA: str
+    teamB: str
+    vote: str # 'A', 'Draw', or 'B'
+
+class PronosticRequest(BaseModel):
+    teamA: str
+    teamB: str
+    guess: str # 'A', 'Draw', or 'B'
+
+@app.post("/api/user/favorites")
+def add_user_favorite(req: FavoriteRequest, authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    fav_id = db.add_favorite(
+        user_id=user_id,
+        team_a=req.teamA,
+        team_b=req.teamB,
+        xg_a=req.xgA,
+        xg_b=req.xgB,
+        prob_a=req.probWinA,
+        prob_draw=req.probDraw,
+        prob_b=req.probWinB,
+        notes=req.notes
+    )
+    return {"status": "success", "favorite_id": fav_id}
+
+@app.get("/api/user/favorites")
+def get_user_favorites(authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    favs = db.get_user_favorites(user_id)
+    return {"status": "success", "favorites": favs}
+
+@app.delete("/api/user/favorites/{favorite_id}")
+def delete_user_favorite(favorite_id: int, authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    success = db.delete_favorite(user_id, favorite_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Favorite not found or not owned by user")
+    return {"status": "success", "message": "Favorite deleted successfully"}
+
+@app.post("/api/user/presets")
+def add_user_preset(req: PresetRequest, authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    preset_id = db.add_user_preset(
+        user_id=user_id,
+        preset_name=req.presetName,
+        fifa_weight=req.fifaWeight,
+        h2h_weight=req.h2hWeight,
+        decay=req.decayMonths,
+        override_a=req.strengthOverrideA,
+        override_b=req.strengthOverrideB,
+        altitude=req.altitude
+    )
+    return {"status": "success", "preset_id": preset_id}
+
+@app.get("/api/user/presets")
+def get_user_presets(authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    presets = db.get_user_presets(user_id)
+    return {"status": "success", "presets": presets}
+
+@app.delete("/api/user/presets/{preset_id}")
+def delete_user_preset(preset_id: int, authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    success = db.delete_user_preset(user_id, preset_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Preset not found or not owned by user")
+    return {"status": "success", "message": "Preset deleted successfully"}
+
+@app.post("/api/match/vote")
+def cast_match_vote(req: VoteRequest, authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    match_key = db.get_match_key(req.teamA, req.teamB)
+    success = db.cast_vote(match_key, user_id, req.vote)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to cast vote")
+    return {"status": "success", "message": "Vote recorded successfully"}
+
+@app.get("/api/match/vote/{team_a}/{team_b}")
+def get_match_vote(team_a: str, team_b: str, authorization: Optional[str] = Header(None)):
+    match_key = db.get_match_key(team_a, team_b)
+    stats = db.get_match_votes_stats(match_key)
+    
+    # Optional: get user's vote if user is authenticated
+    user_vote = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            user_data = get_current_user_from_supabase(authorization)
+            user_vote = db.get_user_vote_for_match(match_key, user_data["id"])
+        except Exception:
+            pass # Silent fail if auth is invalid for this read-only request
+            
+    return {
+        "status": "success",
+        "stats": stats,
+        "user_vote": user_vote
+    }
+
+@app.post("/api/match/pronostic")
+def cast_match_pronostic(req: PronosticRequest, authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    # Get username from metadata or email
+    meta = user_data.get("user_metadata") or {}
+    username = meta.get("username") or meta.get("display_name") or user_data.get("email", "Usuario").split("@")[0]
+    
+    success = db.register_official_pronostic(
+        user_id=user_id,
+        username=username,
+        team_a=req.teamA,
+        team_b=req.teamB,
+        guess=req.guess
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail="Ya has registrado un pronóstico pendiente para este partido.")
+    return {"status": "success", "message": "Pronóstico oficial registrado."}
+
+@app.get("/api/match/pronostic/{team_a}/{team_b}")
+def get_match_pronostic(team_a: str, team_b: str, authorization: Optional[str] = Header(None)):
+    user_data = get_current_user_from_supabase(authorization)
+    user_id = user_data["id"]
+    pronostic = db.get_user_match_pronostic(user_id, team_a, team_b)
+    return {"status": "success", "pronostic": pronostic}
+
+@app.get("/api/leaderboard")
+def get_leaderboard():
+    rankings = db.get_leaderboard_rankings()
+    return {"status": "success", "leaderboard": rankings}
 
 # Mount static files (HTML, CSS, JS) at the end, so it doesn't mask API routes
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

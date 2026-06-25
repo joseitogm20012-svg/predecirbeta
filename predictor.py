@@ -538,6 +538,9 @@ def load_match_raw_data(team_a, team_b, half_life_months, matches, ratings, xg_d
     
     h2h = get_h2h_stats(team_a, team_b, matches)
     
+    matches_history_a = get_team_history(team_a, matches, ratings, half_life_months)
+    matches_history_b = get_team_history(team_b, matches, ratings, half_life_months)
+    
     return {
         "xg_real_a_home": xg_real_a_home,
         "source_a_tag": source_a_tag,
@@ -550,34 +553,33 @@ def load_match_raw_data(team_a, team_b, half_life_months, matches, ratings, xg_d
         "elo_a": elo_a,
         "elo_b": elo_b,
         "h2h_count": h2h["count"],
-        "h2h_avg_gd": h2h["avgGd"]
+        "h2h_avg_gd": h2h["avgGd"],
+        "matches_count_a": len(matches_history_a),
+        "matches_count_b": len(matches_history_b)
     }
 
 def compute_xg_from_raw_data(raw_data, rank_a, rank_b, fifa_weight, h2h_weight):
     """
-    Fase 2: Separación de responsabilidades - Cálculo matemático puro de xG.
-    Para equipos sin estadísticas FBref reales (source != fbref_world_cup),
-    el peso del ranking FIFA se amplifica un 40% para compensar el sesgo
-    del historial histórico antiguo.
+    Fase 2: Cálculo matemático puro de xG utilizando promedio ponderado real de componentes.
     """
     gs_a = raw_data["gs_a"]
     gc_a = raw_data["gc_a"]
     gs_b = raw_data["gs_b"]
     gc_b = raw_data["gc_b"]
     
-    # Base expected goals from historical forms
-    xg_a = gs_a * gc_b
-    xg_b = gs_b * gc_a
+    # 1. Componente de Form (Historial reciente y xG de FBref)
+    xg_form_a = gs_a * gc_b
+    xg_form_b = gs_b * gc_a
     
-    # Elo fallbacks if forms are too low
+    # Fallback si la forma calculada es casi nula
     elo_a = raw_data["elo_a"]
     elo_b = raw_data["elo_b"]
-    if xg_a <= 0.1:
-        xg_a = max(0.3, 1.35 + (elo_a - elo_b) / 400.0)
-    if xg_b <= 0.1:
-        xg_b = max(0.3, 1.35 + (elo_b - elo_a) / 400.0)
+    if xg_form_a <= 0.1:
+        xg_form_a = max(0.3, 1.35 + (elo_a - elo_b) / 400.0)
+    if xg_form_b <= 0.1:
+        xg_form_b = max(0.3, 1.35 + (elo_b - elo_a) / 400.0)
     
-    # Blend con xG real si está disponible
+    # Blend con xG real de FBref si está disponible
     xg_real_a_home = raw_data["xg_real_a_home"]
     source_a_tag = raw_data["source_a_tag"]
     xg_real_b_away = raw_data["xg_real_b_away"]
@@ -588,39 +590,80 @@ def compute_xg_from_raw_data(raw_data, rank_a, rank_b, fifa_weight, h2h_weight):
     
     if xg_real_a_home and xg_real_a_home > 0:
         blend_w = 0.70 if source_a_tag == "fbref" else 0.60
-        xg_a = blend_w * xg_real_a_home + (1.0 - blend_w) * xg_a
+        xg_form_a = blend_w * xg_real_a_home + (1.0 - blend_w) * xg_form_a
         xg_source_a = source_a_tag
     
     if xg_real_b_away and xg_real_b_away > 0:
         blend_w = 0.70 if source_b_tag == "fbref" else 0.60
-        xg_b = blend_w * xg_real_b_away + (1.0 - blend_w) * xg_b
+        xg_form_b = blend_w * xg_real_b_away + (1.0 - blend_w) * xg_form_b
         xg_source_b = source_b_tag
 
-    # FIFA Ranking adjust
-    # Si un equipo solo tiene datos históricos (no FBref real), amplificamos
-    # el peso FIFA +40% para que el ranking actual compense el sesgo histórico.
+    # 2. Componente de Ranking (FIFA & ELO)
+    # Expected goals derived from ratings
+    xg_elo_a = 1.35 + (elo_a - elo_b) / 400.0
+    xg_elo_b = 1.35 + (elo_b - elo_a) / 400.0
+    
+    # FIFA rank difference
     rank_diff = rank_b - rank_a
-    boost_a = 1.4 if source_a_tag == "modelo" else 1.0
-    boost_b = 1.4 if source_b_tag == "modelo" else 1.0
-    effective_fifa_weight = fifa_weight * max(boost_a, boost_b)
-    effective_fifa_weight = min(effective_fifa_weight, 0.50)  # cap at 50%
+    xg_fifa_a = 1.35 + (rank_diff / 50.0)
+    xg_fifa_b = 1.35 - (rank_diff / 50.0)
     
-    fifa_mult_a = 1.0 + (rank_diff / 100.0) * effective_fifa_weight
-    fifa_mult_b = 1.0 - (rank_diff / 100.0) * effective_fifa_weight
+    xg_ranking_a = 0.5 * xg_elo_a + 0.5 * xg_fifa_a
+    xg_ranking_b = 0.5 * xg_elo_b + 0.5 * xg_fifa_b
     
-    xg_a *= max(0.2, fifa_mult_a)
-    xg_b *= max(0.2, fifa_mult_b)
+    # Clamping of ranking components
+    xg_ranking_a = max(0.3, min(3.5, xg_ranking_a))
+    xg_ranking_b = max(0.3, min(3.5, xg_ranking_b))
     
-    # H2H adjust
+    # 3. Componente H2H
+    h2h_count = raw_data["h2h_count"]
+    h2h_avg_gd = raw_data["h2h_avg_gd"]
+    
+    if h2h_count > 0:
+        xg_h2h_a = 1.35 + h2h_avg_gd
+        xg_h2h_b = 1.35 - h2h_avg_gd
+    else:
+        # Fallback to recent form if no H2H exists
+        xg_h2h_a = xg_form_a
+        xg_h2h_b = xg_form_b
+        
+    xg_h2h_a = max(0.3, min(3.5, xg_h2h_a))
+    xg_h2h_b = max(0.3, min(3.5, xg_h2h_b))
+
+    # --- Reglas de Oro ---
+    # Regla 1: Si no hay H2H en tu CSV -> PON H2H EN 0%
+    if h2h_count == 0:
+        h2h_weight = 0.0
+        
+    # Regla 2: Si un equipo tiene <5 partidos en la base de datos reciente -> subir FIFA a 55%
+    matches_count_a = raw_data.get("matches_count_a", 10)
+    matches_count_b = raw_data.get("matches_count_b", 10)
+    if matches_count_a < 5 or matches_count_b < 5:
+        fifa_weight = max(fifa_weight, 0.55)
+
+    # Asegurar que la suma de pesos no supere 1.0 (100%)
+    total_w = fifa_weight + h2h_weight
+    if total_w > 1.0:
+        w_fifa = fifa_weight / total_w
+        w_h2h = h2h_weight / total_w
+        w_form = 0.0
+    else:
+        w_fifa = fifa_weight
+        w_h2h = h2h_weight
+        w_form = 1.0 - total_w
+
+    # Promedio ponderado final
+    xg_a = w_form * xg_form_a + w_fifa * xg_ranking_a + w_h2h * xg_h2h_a
+    xg_b = w_form * xg_form_b + w_fifa * xg_ranking_b + w_h2h * xg_h2h_b
+    
+    # H2H multipliers for backward compatibility in API
     h2h_mult_a = 1.0
     h2h_mult_b = 1.0
-    if raw_data["h2h_count"] > 0:
-        h2h_mult_a = 1.0 + (raw_data["h2h_avg_gd"] / 4.0) * h2h_weight
-        h2h_mult_b = 1.0 - (raw_data["h2h_avg_gd"] / 4.0) * h2h_weight
-        xg_a *= max(0.2, h2h_mult_a)
-        xg_b *= max(0.2, h2h_mult_b)
-        
-    # Clamping
+    if h2h_count > 0:
+        h2h_mult_a = 1.0 + (h2h_avg_gd / 4.0) * h2h_weight
+        h2h_mult_b = 1.0 - (h2h_avg_gd / 4.0) * h2h_weight
+
+    # Clamp final results
     xg_a = max(0.1, min(4.5, xg_a))
     xg_b = max(0.1, min(4.5, xg_b))
     

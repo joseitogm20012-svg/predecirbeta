@@ -41,7 +41,17 @@ def test_ai_crud_flow():
             "predictedScore": "2-0",
             "modelName": "Claude 3.5",
             "stage": "Fase de Grupos",
-            "keyPlayers": "Messi (Ok)"
+            "keyPlayers": "Messi (Ok)",
+            "oddsA": 1.85,
+            "oddsDraw": 3.40,
+            "oddsB": 4.20,
+            "odds": {
+                "input-odds-a": 1.85,
+                "input-odds-draw": 3.40,
+                "input-odds-b": 4.20,
+                "in-btts-yes": 1.95,
+                "in-btts-no": 1.80
+            }
         }
         res = client.post("/api/ai-analyses", json=payload)
         assert res.status_code == 401
@@ -57,6 +67,11 @@ def test_ai_crud_flow():
         assert data["status"] == "success"
         analysis_id = data["analysis"]["id"]
         assert data["analysis"]["match_key"] == "argentina-venezuela"
+        assert data["analysis"]["odds_a"] == 1.85
+        assert data["analysis"]["odds_draw"] == 3.40
+        assert data["analysis"]["odds_b"] == 4.20
+        assert data["analysis"]["odds"]["input-odds-a"] == 1.85
+        assert data["analysis"]["odds"]["in-btts-yes"] == 1.95
         
         # 5. Test retrieve analyses
         res = client.get("/api/ai-analyses")
@@ -68,6 +83,11 @@ def test_ai_crud_flow():
         assert res.status_code == 200
         assert res.json()["status"] == "success"
         assert res.json()["analysis"]["analysis_text"] == "Test analysis narrative"
+        assert res.json()["analysis"]["odds_a"] == 1.85
+        assert res.json()["analysis"]["odds_draw"] == 3.40
+        assert res.json()["analysis"]["odds_b"] == 4.20
+        assert res.json()["analysis"]["odds"]["input-odds-a"] == 1.85
+        assert res.json()["analysis"]["odds"]["in-btts-yes"] == 1.95
         
         # 7. Test retrieve specific match with reversed order (venezuela vs argentina)
         res = client.get("/api/ai-analyses/venezuela/argentina")

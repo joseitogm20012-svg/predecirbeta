@@ -1,0 +1,3 @@
+hacer los cuadros de ponderacion
+hacer el crud de admin
+arreglar los cuadros

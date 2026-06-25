@@ -1,6 +1,22 @@
 // Predictor Mundial 2026 - Frontend Client Logic
 // Communicates with the FastAPI Python Backend for all computations, simulations, and betting odds analysis.
 
+// Supabase Configuration (NEW)
+const supabaseUrl = "https://lquonmtzxpqrevpnciqt.supabase.co";
+const supabaseAnonKey = "sb_publishable_drrEAs42IYsrGzujj9dsbw_bBvRANvL";
+let supabaseClient = null;
+
+function getSupabase() {
+  if (!supabaseClient) {
+    if (typeof supabase !== 'undefined') {
+      supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+    } else if (window.supabase) {
+      supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    }
+  }
+  return supabaseClient;
+}
+
 // Mapping of Slugs to Country Details (Flags)
 const TEAM_METADATA = {
   "argentina": { name: "Argentina", flag: "🇦🇷", rank: 1 },
@@ -76,6 +92,8 @@ let goalsChart = null;
 let outcomeChart = null;
 let radarChart = null;
 let lastSimulationResult = null; // Global to store the latest simulation result for logging (Fase 6)
+let currentUser = null;
+let currentSessionToken = null;
 
 // DOM Elements
 const selectA = document.getElementById("select-team-a");
@@ -263,6 +281,10 @@ async function initializeApp() {
     // 4. Load backtest metrics
     loadBacktestMetrics();
 
+    // 4.5. Load Presets listeners
+    initPresets();
+    updateWeightsPreview();
+
     // 5. Update UI for the initial match
     updateMatchCard();
 
@@ -295,18 +317,7 @@ function populateSelects() {
     optB.textContent = `${TEAM_METADATA[slug].flag} ${TEAM_METADATA[slug].name}`;
     if (slug === selectedTeamB) optB.selected = true;
     selectB.appendChild(optB);
-
-    if (aiTeamA && aiTeamB) {
-      const optAiA = document.createElement("option");
-      optAiA.value = slug;
-      optAiA.textContent = `${TEAM_METADATA[slug].flag} ${TEAM_METADATA[slug].name}`;
-      aiTeamA.appendChild(optAiA);
-
-      const optAiB = document.createElement("option");
-      optAiB.value = slug;
-      optAiB.textContent = `${TEAM_METADATA[slug].flag} ${TEAM_METADATA[slug].name}`;
-      aiTeamB.appendChild(optAiB);
-    }
+    selectB.appendChild(optB);
   });
 }
 
@@ -359,10 +370,13 @@ function bindListeners() {
         
         // Show targeted tab content
         const targetId = btn.id.replace("tab-btn-", "tab-");
-        if (targetId === "tab-ai-crud") {
-          checkAIAdminStatus();
-        } else if (targetId === "tab-analysis") {
+        if (targetId === "tab-analysis") {
           fetchAITacticalAnalysis(selectedTeamA, selectedTeamB);
+        } else if (targetId === "tab-favorites") {
+          loadUserFavorites();
+          loadUserPresets();
+        } else if (targetId === "tab-leaderboard") {
+          loadLeaderboard();
         }
         const targetContent = document.getElementById(targetId);
         if (targetContent) {
@@ -412,6 +426,27 @@ function bindListeners() {
   });
   if (inputHostCountry) {
     inputHostCountry.addEventListener("change", () => {
+      const resultsTabHeader = document.getElementById("results-tab-header");
+      if (resultsTabHeader && !resultsTabHeader.classList.contains("hidden")) {
+        runPredictionFlow();
+      }
+    });
+  }
+
+  // Real-time update for manual weight changes
+  if (weightFifaSlider) {
+    weightFifaSlider.addEventListener("input", () => {
+      updateWeightsPreview();
+      const resultsTabHeader = document.getElementById("results-tab-header");
+      if (resultsTabHeader && !resultsTabHeader.classList.contains("hidden")) {
+        runPredictionFlow();
+      }
+    });
+  }
+
+  if (weightH2hSlider) {
+    weightH2hSlider.addEventListener("input", () => {
+      updateWeightsPreview();
       const resultsTabHeader = document.getElementById("results-tab-header");
       if (resultsTabHeader && !resultsTabHeader.classList.contains("hidden")) {
         runPredictionFlow();
@@ -484,8 +519,191 @@ function bindListeners() {
     });
   }
   
-  // Initialize AI CRUD/Admin bindings (Login, Prefill, Forms)
-  initAIAdminListeners();
+  // ----------------------------------------------------
+  // Bind new user action listeners
+  // ----------------------------------------------------
+  const btnSaveFav = document.getElementById("btn-save-favorite");
+  if (btnSaveFav) {
+    btnSaveFav.addEventListener("click", async () => {
+      if (!currentSessionToken || !lastSimulationResult) return;
+      
+      const txtNotes = document.getElementById("textarea-private-notes");
+      const notesVal = txtNotes ? txtNotes.value.trim() : "";
+      
+      btnSaveFav.disabled = true;
+      btnSaveFav.textContent = "Guardando...";
+      
+      try {
+        const res = await fetch("/api/user/favorites", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${currentSessionToken}`
+          },
+          body: JSON.stringify({
+            teamA: selectedTeamA,
+            teamB: selectedTeamB,
+            xgA: lastSimulationResult.xgA,
+            xgB: lastSimulationResult.xgB,
+            probWinA: lastSimulationResult.probWinA,
+            probDraw: lastSimulationResult.probDraw,
+            probWinB: lastSimulationResult.probWinB,
+            notes: notesVal
+          })
+        });
+        const json = await res.json();
+        if (json.status === "success") {
+          btnSaveFav.textContent = "⭐ ¡Guardado!";
+          loadUserFavorites();
+          setTimeout(() => {
+            btnSaveFav.disabled = false;
+            btnSaveFav.textContent = "⭐ Guardar en Favoritos";
+          }, 1500);
+        } else {
+          alert("Error al guardar favorito: " + json.detail);
+          btnSaveFav.disabled = false;
+          btnSaveFav.textContent = "⭐ Guardar en Favoritos";
+        }
+      } catch (err) {
+        console.error("Error saving favorite:", err);
+        btnSaveFav.disabled = false;
+        btnSaveFav.textContent = "⭐ Guardar en Favoritos";
+      }
+    });
+  }
+
+  // Poll Vote Buttons
+  const btnVoteA = document.getElementById("btn-vote-a");
+  const btnVoteDraw = document.getElementById("btn-vote-draw");
+  const btnVoteB = document.getElementById("btn-vote-b");
+  
+  const castPollVote = async (voteVal) => {
+    if (!currentSessionToken) return;
+    try {
+      const res = await fetch("/api/match/vote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${currentSessionToken}`
+        },
+        body: JSON.stringify({
+          teamA: selectedTeamA,
+          teamB: selectedTeamB,
+          vote: voteVal
+        })
+      });
+      const json = await res.json();
+      if (json.status === "success") {
+        loadPollData();
+      }
+    } catch (err) {
+      console.error("Error casting vote:", err);
+    }
+  };
+
+  if (btnVoteA) btnVoteA.addEventListener("click", () => castPollVote("A"));
+  if (btnVoteDraw) btnVoteDraw.addEventListener("click", () => castPollVote("Draw"));
+  if (btnVoteB) btnVoteB.addEventListener("click", () => castPollVote("B"));
+
+  // Presets Save Button
+  const btnSavePreset = document.getElementById("btn-save-preset");
+  if (btnSavePreset) {
+    btnSavePreset.addEventListener("click", async () => {
+      if (!currentSessionToken) return;
+      const presetName = prompt("Introduce un nombre para tu preset personalizado (ej. 'Mi Modelo Ofensivo'):");
+      if (!presetName || !presetName.trim()) return;
+      
+      const wFifa = document.getElementById("input-weight-fifa");
+      const wH2h = document.getElementById("input-weight-h2h");
+      const decay = document.getElementById("input-decay");
+      const ovrA = document.getElementById("input-override-a");
+      const ovrB = document.getElementById("input-override-b");
+      const altitude = document.getElementById("input-altitude");
+      
+      const payload = {
+        presetName: presetName.trim(),
+        fifaWeight: parseFloat(wFifa ? wFifa.value : 30),
+        h2hWeight: parseFloat(wH2h ? wH2h.value : 20),
+        decayMonths: parseFloat(decay ? decay.value : 18),
+        strengthOverrideA: parseFloat(ovrA ? ovrA.value : 1.0),
+        strengthOverrideB: parseFloat(ovrB ? ovrB.value : 1.0),
+        altitude: parseInt(altitude ? altitude.value : 0)
+      };
+      
+      try {
+        const res = await fetch("/api/user/presets", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${currentSessionToken}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.status === "success") {
+          loadUserPresets();
+        } else {
+          alert("Error al guardar preset: " + json.detail);
+        }
+      } catch (err) {
+        console.error("Error saving preset:", err);
+      }
+    });
+  }
+
+  // Pronóstico Oficial Leaderboard Button
+  const btnSubmitPronostic = document.getElementById("btn-submit-pronostic");
+  if (btnSubmitPronostic) {
+    btnSubmitPronostic.addEventListener("click", async () => {
+      if (!currentSessionToken) return;
+      const metaA = TEAM_METADATA[selectedTeamA] || { name: selectedTeamA.toUpperCase() };
+      const metaB = TEAM_METADATA[selectedTeamB] || { name: selectedTeamB.toUpperCase() };
+      
+      const choice = prompt(`Selecciona tu pronóstico oficial para el ranking:\nEscribe 'A' para victoria de ${metaA.name}\nEscribe 'D' para Empate\nEscribe 'B' para victoria de ${metaB.name}`);
+      if (!choice) return;
+      
+      let guessVal = "";
+      if (choice.trim().toUpperCase() === "A") guessVal = "A";
+      else if (choice.trim().toUpperCase() === "D") guessVal = "Draw";
+      else if (choice.trim().toUpperCase() === "B") guessVal = "B";
+      else {
+        alert("Opción no válida. Escribe 'A', 'D' o 'B'.");
+        return;
+      }
+      
+      btnSubmitPronostic.disabled = true;
+      btnSubmitPronostic.textContent = "Enviando...";
+      
+      try {
+        const res = await fetch("/api/match/pronostic", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${currentSessionToken}`
+          },
+          body: JSON.stringify({
+            teamA: selectedTeamA,
+            teamB: selectedTeamB,
+            guess: guessVal
+          })
+        });
+        const json = await res.json();
+        if (json.status === "success") {
+          loadUserPronosticStatus();
+          loadLeaderboard();
+        } else {
+          alert(json.detail || "Error al registrar pronóstico.");
+          loadUserPronosticStatus();
+        }
+      } catch (err) {
+        console.error("Error submitting pronostic:", err);
+        loadUserPronosticStatus();
+      }
+    });
+  }
+  
+  // Initialize Supabase User Authentication bindings (Login, Register, Session)
+  initSupabaseAuth();
 }
 
 function updateMatchCard(fullReload = true) {
@@ -548,6 +766,10 @@ function updateMatchCard(fullReload = true) {
     
     // Check and load AI analysis if it was already saved for this match
     fetchAITacticalAnalysis(selectedTeamA, selectedTeamB);
+    
+    // Load community poll and official predictions status
+    loadPollData();
+    loadUserPronosticStatus();
   }
 }
 
@@ -2061,356 +2283,122 @@ function renderMatchSummary(data, slugA, slugB) {
 }
 
 /* ==========================================================================
-   AI CRUD & LOGIN LOGIC (NEW)
+   PRESETS LOGIC (NUEVO)
    ========================================================================== */
-let adminPassword = localStorage.getItem("adminPassword") || "";
-let savedAnalyses = [];
+function initPresets() {
+  const presetBtns = document.querySelectorAll(".preset-btn");
+  if (!presetBtns.length) return;
 
-function checkAIAdminStatus() {
-  const loginPanel = document.getElementById("ai-crud-login-panel");
-  const adminPanel = document.getElementById("ai-crud-admin-panel");
-  if (!loginPanel || !adminPanel) return;
-  
-  if (adminPassword) {
-    loginPanel.style.display = "none";
-    adminPanel.style.display = "block";
-    loadAIAnalyses();
+  presetBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const preset = btn.dataset.preset;
+
+      // Sync active states for all buttons with the selected preset across both groups
+      presetBtns.forEach(b => {
+        if (b.dataset.preset === preset) {
+          b.classList.add("active", "btn-primary");
+          b.classList.remove("btn-secondary");
+        } else {
+          b.classList.remove("active", "btn-primary");
+          b.classList.add("btn-secondary");
+        }
+      });
+
+      const wFifa = document.getElementById("input-weight-fifa");
+      const wH2h = document.getElementById("input-weight-h2h");
+      const decay = document.getElementById("input-decay");
+      const ovrA = document.getElementById("input-override-a");
+      const ovrB = document.getElementById("input-override-b");
+      
+      if (!wFifa || !wH2h || !decay || !ovrA || !ovrB) return;
+
+      if (preset === "grupos") {
+        wFifa.value = 30;
+        wH2h.value = 10;
+        decay.value = 12;
+        ovrA.value = 1.0;
+        ovrB.value = 1.0;
+      } else if (preset === "eliminacion") {
+        wFifa.value = 35;
+        wH2h.value = 15;
+        decay.value = 12;
+        ovrA.value = 0.90;
+        ovrB.value = 0.90;
+      } else if (preset === "eliminatorias") {
+        wFifa.value = 20;
+        wH2h.value = 30;
+        decay.value = 18;
+        ovrA.value = 1.0;
+        ovrB.value = 1.0;
+      } else if (preset === "amistoso") {
+        wFifa.value = 45;
+        wH2h.value = 5;
+        decay.value = 18;
+        ovrA.value = 0.85;
+        ovrB.value = 0.85;
+      } else if (preset === "debutante") {
+        wFifa.value = 40;
+        wH2h.value = 0;
+        decay.value = 24;
+        ovrA.value = 0.95;
+        ovrB.value = 0.95;
+      } else if (preset === "clasico") {
+        wFifa.value = 15;
+        wH2h.value = 45;
+        decay.value = 24;
+        ovrA.value = 1.0;
+        ovrB.value = 1.0;
+      } else if (preset === "altitud") {
+        wFifa.value = 20;
+        wH2h.value = 10;
+        decay.value = 12;
+        ovrA.value = 1.20;
+        ovrB.value = 0.75;
+        const altitudeInput = document.getElementById("input-altitude");
+        if (altitudeInput) altitudeInput.value = 2800;
+      } else if (preset === "desigual") {
+        wFifa.value = 50;
+        wH2h.value = 0;
+        decay.value = 12;
+        ovrA.value = 1.10;
+        ovrB.value = 0.80;
+      }
+      
+      // Update UI representations
+      updateMatchCard(true);
+      updateWeightsPreview();
+
+      // Instantly run the simulation if results panel is already visible
+      const resultsTabHeader = document.getElementById("results-tab-header");
+      if (resultsTabHeader && !resultsTabHeader.classList.contains("hidden")) {
+        runPredictionFlow();
+      }
+    });
+  });
+}
+
+function updateWeightsPreview() {
+  const wFifaInput = document.getElementById("input-weight-fifa");
+  const wH2hInput = document.getElementById("input-weight-h2h");
+  const previewDiv = document.getElementById("weights-formula-preview");
+  if (!wFifaInput || !wH2hInput || !previewDiv) return;
+
+  const fifaVal = parseFloat(wFifaInput.value) || 0;
+  const h2hVal = parseFloat(wH2hInput.value) || 0;
+  const total = fifaVal + h2hVal;
+
+  let realFifa, realH2h, realForm;
+  if (total > 100) {
+    realFifa = Math.round((fifaVal / total) * 100);
+    realH2h = Math.round((h2hVal / total) * 100);
+    realForm = 0;
   } else {
-    loginPanel.style.display = "block";
-    adminPanel.style.display = "none";
+    realFifa = Math.round(fifaVal);
+    realH2h = Math.round(h2hVal);
+    realForm = Math.max(0, 100 - realFifa - realH2h);
   }
-}
 
-async function loadAIAnalyses() {
-  const aiAnalysesList = document.getElementById("ai-analyses-list");
-  if (!aiAnalysesList) return;
-  
-  aiAnalysesList.innerHTML = `<div class="loading-placeholder">Cargando análisis...</div>`;
-  try {
-    const res = await fetch("/api/ai-analyses");
-    const json = await res.json();
-    savedAnalyses = json.analyses || [];
-    renderAIAnalysesList();
-  } catch (error) {
-    console.error("Error loading analyses:", error);
-    aiAnalysesList.innerHTML = `<div class="loading-placeholder">Error al cargar la lista.</div>`;
-  }
-}
-
-function renderAIAnalysesList() {
-  const aiAnalysesList = document.getElementById("ai-analyses-list");
-  const aiSearchInput = document.getElementById("ai-search-input");
-  if (!aiAnalysesList) return;
-  
-  aiAnalysesList.innerHTML = "";
-  const query = aiSearchInput ? aiSearchInput.value.toLowerCase().trim() : "";
-  
-  const filtered = savedAnalyses.filter(item => {
-    const nameA = (TEAM_METADATA[item.teamA]?.name || item.teamA).toLowerCase();
-    const nameB = (TEAM_METADATA[item.teamB]?.name || item.teamB).toLowerCase();
-    const model = (item.model_name || "").toLowerCase();
-    return nameA.includes(query) || nameB.includes(query) || model.includes(query);
-  });
-  
-  if (filtered.length === 0) {
-    aiAnalysesList.innerHTML = `<div class="loading-placeholder">No se encontraron análisis.</div>`;
-    return;
-  }
-  
-  filtered.forEach(item => {
-    const metaA = TEAM_METADATA[item.teamA] || { name: item.teamA.toUpperCase(), flag: "🏳️" };
-    const metaB = TEAM_METADATA[item.teamB] || { name: item.teamB.toUpperCase(), flag: "🏳️" };
-    
-    const card = document.createElement("div");
-    card.className = "ai-match-card";
-    
-    card.innerHTML = `
-      <div class="ai-match-card-header">
-        <span>${item.stage || "Fase de Grupos"} · Confianza: <strong>${item.confidence}%</strong></span>
-      </div>
-      <div class="ai-match-card-title">${metaA.flag} ${metaA.name} vs ${metaB.flag} ${metaB.name}</div>
-      <div class="ai-match-card-actions">
-        <button class="btn btn-resolve-loss btn-edit-ai" data-id="${item.id}" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(240,179,16,0.15); border-color: rgba(240,179,16,0.2); color: var(--color-primary); cursor: pointer;">✏️ Editar</button>
-        <button class="btn btn-resolve-loss btn-delete-ai" data-id="${item.id}" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.2); color: #ef4444; cursor: pointer; margin-left: 6px;">🗑️ Borrar</button>
-      </div>
-    `;
-    aiAnalysesList.appendChild(card);
-  });
-}
-
-function clearAIForm() {
-  const aiIdField = document.getElementById("ai-id-field");
-  const aiModel = document.getElementById("ai-model");
-  const aiConfidence = document.getElementById("ai-confidence");
-  const aiPredictedScore = document.getElementById("ai-predicted-score");
-  const aiStage = document.getElementById("ai-stage");
-  const aiKeyPlayers = document.getElementById("ai-key-players");
-  const aiKeyTips = document.getElementById("ai-key-tips");
-  const aiText = document.getElementById("ai-text");
-  const aiTeamA = document.getElementById("ai-team-a");
-  const aiTeamB = document.getElementById("ai-team-b");
-  
-  if (aiIdField) aiIdField.value = "";
-  if (aiModel) aiModel.value = "";
-  if (aiConfidence) aiConfidence.value = "80";
-  if (aiPredictedScore) aiPredictedScore.value = "";
-  if (aiStage) aiStage.value = "Fase de Grupos";
-  if (aiKeyPlayers) aiKeyPlayers.value = "";
-  if (aiKeyTips) aiKeyTips.value = "";
-  if (aiText) aiText.value = "";
-  
-  const formTitle = document.getElementById("crud-form-title");
-  if (formTitle) formTitle.textContent = "Guardar Análisis de IA";
-  
-  if (aiTeamA && aiTeamA.tomselect) aiTeamA.tomselect.setValue("");
-  else if (aiTeamA) aiTeamA.value = "";
-  
-  if (aiTeamB && aiTeamB.tomselect) aiTeamB.tomselect.setValue("");
-  else if (aiTeamB) aiTeamB.value = "";
-}
-
-function initAIAdminListeners() {
-  const aiLoginForm = document.getElementById("ai-login-form");
-  const btnAiLogout = document.getElementById("btn-ai-logout");
-  const aiAnalysisForm = document.getElementById("ai-analysis-form");
-  const btnPrefillAi = document.getElementById("btn-prefill-ai");
-  const btnAiClear = document.getElementById("btn-ai-clear");
-  const aiSearchInput = document.getElementById("ai-search-input");
-  const aiAnalysesList = document.getElementById("ai-analyses-list");
-  
-  if (aiLoginForm) {
-    aiLoginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const pwdInput = document.getElementById("ai-login-password");
-      const errDiv = document.getElementById("ai-login-error");
-      if (!pwdInput || !errDiv) return;
-      
-      errDiv.style.display = "none";
-      const pwd = pwdInput.value;
-      
-      try {
-        const res = await fetch("/api/ai-auth/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password: pwd })
-        });
-        const json = await res.json();
-        if (res.ok && json.status === "success") {
-          adminPassword = pwd;
-          localStorage.setItem("adminPassword", pwd);
-          pwdInput.value = "";
-          checkAIAdminStatus();
-        } else {
-          errDiv.textContent = json.detail || "Contraseña incorrecta";
-          errDiv.style.display = "block";
-        }
-      } catch (err) {
-        console.error("Auth error:", err);
-        errDiv.textContent = "Error de red al verificar contraseña";
-        errDiv.style.display = "block";
-      }
-    });
-  }
-  
-  if (btnAiLogout) {
-    btnAiLogout.addEventListener("click", () => {
-      adminPassword = "";
-      localStorage.removeItem("adminPassword");
-      checkAIAdminStatus();
-    });
-  }
-  
-  if (btnPrefillAi) {
-    btnPrefillAi.addEventListener("click", () => {
-      if (!lastSimulationResult) {
-        alert("⚠️ Primero debes simular un partido en la pestaña de Análisis.");
-        return;
-      }
-      
-      const aiTeamA = document.getElementById("ai-team-a");
-      const aiTeamB = document.getElementById("ai-team-b");
-      const aiConfidence = document.getElementById("ai-confidence");
-      const aiKeyTips = document.getElementById("ai-key-tips");
-      
-      if (aiTeamA && aiTeamA.tomselect) aiTeamA.tomselect.setValue(selectedTeamA);
-      else if (aiTeamA) aiTeamA.value = selectedTeamA;
-      
-      if (aiTeamB && aiTeamB.tomselect) aiTeamB.tomselect.setValue(selectedTeamB);
-      else if (aiTeamB) aiTeamB.value = selectedTeamB;
-      
-      if (aiConfidence) aiConfidence.value = "85";
-      
-      if (aiKeyTips) {
-        const defaultTips = [];
-        const nameAVal = TEAM_METADATA[selectedTeamA]?.name || selectedTeamA;
-        const nameBVal = TEAM_METADATA[selectedTeamB]?.name || selectedTeamB;
-        if (lastSimulationResult.probWinA > 0.45) {
-          defaultTips.push(`Favorito ${nameAVal}`);
-        } else if (lastSimulationResult.probWinB > 0.45) {
-          defaultTips.push(`Favorito ${nameBVal}`);
-        }
-        
-        if (lastSimulationResult.cornersPrediction) {
-          defaultTips.push(`${lastSimulationResult.cornersPrediction.expectedTotal.toFixed(0)} córneres aprox.`);
-        }
-        aiKeyTips.value = defaultTips.join(", ");
-      }
-      
-      alert("⚡ Datos de simulación actual precargados.");
-    });
-  }
-  
-  if (btnAiClear) {
-    btnAiClear.addEventListener("click", clearAIForm);
-  }
-  
-  if (aiSearchInput) {
-    aiSearchInput.addEventListener("input", renderAIAnalysesList);
-  }
-  
-  if (aiAnalysisForm) {
-    aiAnalysisForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      
-      const aiIdField = document.getElementById("ai-id-field");
-      const aiTeamA = document.getElementById("ai-team-a");
-      const aiTeamB = document.getElementById("ai-team-b");
-      const aiConfidence = document.getElementById("ai-confidence");
-      const aiStage = document.getElementById("ai-stage");
-      const aiKeyTips = document.getElementById("ai-key-tips");
-      const aiText = document.getElementById("ai-text");
-      
-      const tipsArr = aiKeyTips.value.split(",")
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
-        
-      const payload = {
-        id: aiIdField.value ? parseInt(aiIdField.value) : null,
-        teamA: aiTeamA.value,
-        teamB: aiTeamB.value,
-        analysisText: aiText.value,
-        keyTips: tipsArr,
-        confidence: parseInt(aiConfidence.value),
-        predictedScore: "null",
-        modelName: "Manual",
-        stage: aiStage.value,
-        keyPlayers: ""
-      };
-      
-      try {
-        const res = await fetch("/api/ai-analyses", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Admin-Password": adminPassword
-          },
-          body: JSON.stringify(payload)
-        });
-        
-        if (res.status === 401) {
-          alert("🔒 Sesión no autorizada o expirada. Por favor, vuelve a iniciar sesión.");
-          adminPassword = "";
-          localStorage.removeItem("adminPassword");
-          checkAIAdminStatus();
-          return;
-        }
-        
-        const json = await res.json();
-        if (res.ok && json.status === "success") {
-          alert("✅ Análisis de IA guardado correctamente.");
-          clearAIForm();
-          loadAIAnalyses();
-          // Reload active match analysis in case they edited/saved the current match
-          fetchAITacticalAnalysis(selectedTeamA, selectedTeamB);
-        } else {
-          alert("Error al guardar: " + (json.detail || "Error desconocido"));
-        }
-      } catch (err) {
-        console.error("Save analysis error:", err);
-        alert("Error de red al guardar análisis.");
-      }
-    });
-  }
-  
-  if (aiAnalysesList) {
-    aiAnalysesList.addEventListener("click", async (e) => {
-      const editBtn = e.target.closest(".btn-edit-ai");
-      const deleteBtn = e.target.closest(".btn-delete-ai");
-      
-      const aiIdField = document.getElementById("ai-id-field");
-      const aiTeamA = document.getElementById("ai-team-a");
-      const aiTeamB = document.getElementById("ai-team-b");
-      const aiModel = document.getElementById("ai-model");
-      const aiConfidence = document.getElementById("ai-confidence");
-      const aiPredictedScore = document.getElementById("ai-predicted-score");
-      const aiStage = document.getElementById("ai-stage");
-      const aiKeyPlayers = document.getElementById("ai-key-players");
-      const aiKeyTips = document.getElementById("ai-key-tips");
-      const aiText = document.getElementById("ai-text");
-      
-      if (editBtn) {
-        const id = parseInt(editBtn.dataset.id);
-        const item = savedAnalyses.find(a => a.id === id);
-        if (item) {
-          aiIdField.value = item.id;
-          
-          if (aiTeamA && aiTeamA.tomselect) aiTeamA.tomselect.setValue(item.teamA);
-          else if (aiTeamA) aiTeamA.value = item.teamA;
-          
-          if (aiTeamB && aiTeamB.tomselect) aiTeamB.tomselect.setValue(item.teamB);
-          else if (aiTeamB) aiTeamB.value = item.teamB;
-          
-          if (aiModel) aiModel.value = item.model_name;
-          if (aiConfidence) aiConfidence.value = item.confidence;
-          if (aiPredictedScore) aiPredictedScore.value = item.predicted_score;
-          if (aiStage) aiStage.value = item.stage || "Fase de Grupos";
-          if (aiKeyPlayers) aiKeyPlayers.value = item.key_players || "";
-          if (aiKeyTips) aiKeyTips.value = (item.key_tips || []).join(", ");
-          if (aiText) aiText.value = item.analysis_text;
-          
-          const formTitle = document.getElementById("crud-form-title");
-          if (formTitle) formTitle.textContent = "✏️ Editar Análisis de IA";
-          
-          const formCard = aiAnalysisForm ? aiAnalysisForm.closest(".glass-card") : null;
-          if (formCard) formCard.scrollIntoView({ behavior: 'smooth' });
-        }
-      }
-      
-      if (deleteBtn) {
-        if (!confirm("¿Estás seguro de que deseas eliminar este análisis?")) return;
-        const id = parseInt(deleteBtn.dataset.id);
-        
-        try {
-          const res = await fetch(`/api/ai-analyses/${id}`, {
-            method: "DELETE",
-            headers: {
-              "X-Admin-Password": adminPassword
-            }
-          });
-          
-          if (res.status === 401) {
-            alert("🔒 Sesión no autorizada o expirada.");
-            adminPassword = "";
-            localStorage.removeItem("adminPassword");
-            checkAIAdminStatus();
-            return;
-          }
-          
-          const json = await res.json();
-          if (res.ok && json.status === "success") {
-            loadAIAnalyses();
-            // Reload active match analysis in case they deleted the current match
-            fetchAITacticalAnalysis(selectedTeamA, selectedTeamB);
-          } else {
-            alert("Error al borrar: " + (json.detail || "Error desconocido"));
-          }
-        } catch (err) {
-          console.error("Delete analysis error:", err);
-          alert("Error de red al borrar.");
-        }
-      }
-    });
-  }
+  previewDiv.innerHTML = `Distribución Real: FIFA <strong>${realFifa}%</strong> | H2H <strong>${realH2h}%</strong> | Forma Histórica <strong>${realForm}%</strong>`;
 }
 
 async function fetchAITacticalAnalysis(teamA, teamB) {
@@ -2424,6 +2412,32 @@ async function fetchAITacticalAnalysis(teamA, teamB) {
     
     if (res.ok && json.status === "success" && json.analysis) {
       const item = json.analysis;
+      
+      // Pre-fill all odds if they exist in the tactical analysis dictionary
+      if (item.odds) {
+        Object.keys(item.odds).forEach(originalId => {
+          const inputEl = document.getElementById(originalId);
+          if (inputEl) {
+            inputEl.value = item.odds[originalId] !== null ? item.odds[originalId] : "";
+            // Trigger input event to update EV calculations automatically
+            inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        });
+      } else {
+        // Fallback for old items
+        if (inputOddsA && item.odds_a !== undefined) {
+          inputOddsA.value = item.odds_a !== null ? item.odds_a : "";
+          inputOddsA.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (inputOddsDraw && item.odds_draw !== undefined) {
+          inputOddsDraw.value = item.odds_draw !== null ? item.odds_draw : "";
+          inputOddsDraw.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (inputOddsB && item.odds_b !== undefined) {
+          inputOddsB.value = item.odds_b !== null ? item.odds_b : "";
+          inputOddsB.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
       
       const badgeConf = document.getElementById("ai-confidence-badge");
       const verdictText = document.getElementById("ai-verdict-text");
@@ -2491,4 +2505,751 @@ function formatMarkdownSimple(text) {
   formatted = formatted.replace(/<\/ul>\s*<ul>/g, "");
   
   return formatted;
+}
+
+/* ==========================================================================
+   USER AUTH & SUPABASE INTEGRATION (NEW)
+   ========================================================================== */
+function initSupabaseAuth() {
+  const client = getSupabase();
+  if (!client) {
+    console.warn("Supabase client is not loaded or configured. Auth disabled.");
+    return;
+  }
+
+  // Elements
+  const btnAuthLogout = document.getElementById("btn-auth-logout");
+  
+  const formLogin = document.getElementById("landing-form-login");
+  const formRegister = document.getElementById("landing-form-register");
+  const formForgot = document.getElementById("landing-form-forgot");
+  const formReset = document.getElementById("landing-form-reset");
+  
+  const linkForgotPwd = document.getElementById("landing-link-forgot");
+  const linkGoRegister = document.getElementById("landing-link-go-register");
+  const linkGoLogin = document.getElementById("landing-link-go-login");
+  const linkForgotBack = document.getElementById("landing-link-forgot-back");
+  
+  const errorMsg = document.getElementById("landing-auth-error-msg");
+  const successMsg = document.getElementById("landing-auth-success-msg");
+
+  // Show/Hide views inside the landing card
+  function showAuthView(viewName) {
+    if (errorMsg) errorMsg.classList.add("hidden");
+    if (successMsg) successMsg.classList.add("hidden");
+
+    const titleEl = document.getElementById("landing-auth-title");
+    const subtitleEl = document.getElementById("landing-auth-subtitle");
+    
+    // Hide all forms
+    if (formLogin) formLogin.classList.add("hidden");
+    if (formRegister) formRegister.classList.add("hidden");
+    if (formForgot) formForgot.classList.add("hidden");
+    if (formReset) formReset.classList.add("hidden");
+
+    if (viewName === "login") {
+      if (formLogin) formLogin.classList.remove("hidden");
+      if (titleEl) titleEl.textContent = "Iniciar Sesión";
+      if (subtitleEl) subtitleEl.textContent = "Ingresa tus credenciales para acceder al simulador";
+    } else if (viewName === "register") {
+      if (formRegister) formRegister.classList.remove("hidden");
+      if (titleEl) titleEl.textContent = "Crear Cuenta";
+      if (subtitleEl) subtitleEl.textContent = "Regístrate gratis para acceder a todos los beneficios.";
+    } else if (viewName === "forgot") {
+      if (formForgot) formForgot.classList.remove("hidden");
+      if (titleEl) titleEl.textContent = "Recuperar Contraseña";
+      if (subtitleEl) subtitleEl.textContent = "Ingresa tu email para recibir un enlace de recuperación.";
+    } else if (viewName === "reset") {
+      if (formReset) formReset.classList.remove("hidden");
+      if (titleEl) titleEl.textContent = "Restablecer Contraseña";
+      if (subtitleEl) subtitleEl.textContent = "Escribe tu nueva contraseña a continuación.";
+    }
+  }
+
+  // View switching links
+  if (linkForgotPwd) {
+    linkForgotPwd.addEventListener("click", (e) => {
+      e.preventDefault();
+      showAuthView("forgot");
+    });
+  }
+  if (linkGoRegister) {
+    linkGoRegister.addEventListener("click", (e) => {
+      e.preventDefault();
+      showAuthView("register");
+    });
+  }
+  if (linkGoLogin) {
+    linkGoLogin.addEventListener("click", (e) => {
+      e.preventDefault();
+      showAuthView("login");
+    });
+  }
+  if (linkForgotBack) {
+    linkForgotBack.addEventListener("click", (e) => {
+      e.preventDefault();
+      showAuthView("login");
+    });
+  }
+
+  // Helper to show messages
+  function showStatus(text, type = "error") {
+    if (type === "error") {
+      if (successMsg) successMsg.classList.add("hidden");
+      if (errorMsg) {
+        errorMsg.textContent = text;
+        errorMsg.classList.remove("hidden");
+      }
+    } else {
+      if (errorMsg) errorMsg.classList.add("hidden");
+      if (successMsg) {
+        successMsg.textContent = text;
+        successMsg.classList.remove("hidden");
+      }
+    }
+  }
+
+  // 1. SIGN UP (REGISTER)
+  if (formRegister) {
+    formRegister.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = document.getElementById("landing-register-username").value.trim();
+      const email = document.getElementById("landing-register-email").value.trim();
+      const password = document.getElementById("landing-register-password").value;
+      const confirmPassword = document.getElementById("landing-register-password-confirm").value;
+
+      if (!username) {
+        showStatus("El nombre de usuario es obligatorio.", "error");
+        return;
+      }
+      if (password.length < 6) {
+        showStatus("La contraseña debe tener al menos 6 caracteres.", "error");
+        return;
+      }
+      if (password !== confirmPassword) {
+        showStatus("Las contraseñas no coinciden.", "error");
+        return;
+      }
+
+      showStatus("Creando cuenta...", "success");
+      try {
+        const { data, error } = await client.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: {
+              username: username,
+              display_name: username
+            }
+          }
+        });
+        if (error) throw error;
+        
+        if (data.session) {
+          showStatus("¡Cuenta creada e inicio de sesión exitoso!", "success");
+        } else {
+          showStatus("¡Registro exitoso! Por favor revisa tu bandeja de entrada para verificar tu correo.", "success");
+        }
+      } catch (err) {
+        console.error("SignUp error:", err);
+        showStatus(err.message || "Error al registrar usuario.", "error");
+      }
+    });
+  }
+
+  // 2. SIGN IN (LOGIN)
+  if (formLogin) {
+    formLogin.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const loginInput = document.getElementById("landing-login-email").value.trim();
+      const password = document.getElementById("landing-login-password").value;
+
+      showStatus("Ingresando...", "success");
+      try {
+        let emailToUse = loginInput;
+        
+        // If it doesn't look like an email, assume it's a username and look it up
+        if (!loginInput.includes("@")) {
+          showStatus("Buscando usuario...", "success");
+          try {
+            const res = await fetch("/api/lookup-username", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username: loginInput })
+            });
+            const data = await res.json();
+            if (data.status === "success" && data.email) {
+              emailToUse = data.email;
+            } else {
+              throw new Error("El nombre de usuario no existe.");
+            }
+          } catch (lookupErr) {
+            throw new Error(lookupErr.message || "Error al buscar el usuario.");
+          }
+        }
+
+        showStatus("Autenticando...", "success");
+        const { error } = await client.auth.signInWithPassword({ email: emailToUse, password });
+        if (error) throw error;
+        
+        showStatus("¡Inicio de sesión exitoso!", "success");
+      } catch (err) {
+        console.error("SignIn error:", err);
+        showStatus(err.message || "Credenciales incorrectas o usuario no encontrado.", "error");
+      }
+    });
+  }
+
+  // 3. LOGOUT
+  if (btnAuthLogout) {
+    btnAuthLogout.addEventListener("click", async () => {
+      try {
+        const { error } = await client.auth.signOut();
+        if (error) throw error;
+      } catch (err) {
+        console.error("Logout error:", err);
+      }
+    });
+  }
+
+  // 4. REQUEST PASSWORD RESET
+  if (formForgot) {
+    formForgot.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("landing-forgot-email").value.trim();
+
+      showStatus("Enviando correo...", "success");
+      try {
+        const redirectUrl = window.location.origin + window.location.pathname;
+        const { error } = await client.auth.resetPasswordForEmail(email, {
+          redirectTo: redirectUrl
+        });
+        if (error) throw error;
+        
+        showStatus("Correo enviado. Revisa tu bandeja de entrada para restablecer tu contraseña.", "success");
+      } catch (err) {
+        console.error("Reset request error:", err);
+        showStatus(err.message || "Error al solicitar restablecimiento.", "error");
+      }
+    });
+  }
+
+  // 5. UPDATE PASSWORD (NEW PASSWORD)
+  if (formReset) {
+    formReset.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const password = document.getElementById("landing-reset-password").value;
+      const confirmPassword = document.getElementById("landing-reset-password-confirm").value;
+
+      if (password.length < 6) {
+        showStatus("La contraseña debe tener al menos 6 caracteres.", "error");
+        return;
+      }
+      if (password !== confirmPassword) {
+        showStatus("Las contraseñas no coinciden.", "error");
+        return;
+      }
+
+      showStatus("Actualizando contraseña...", "success");
+      try {
+        const { error } = await client.auth.updateUser({ password });
+        if (error) throw error;
+        
+        showStatus("¡Contraseña actualizada con éxito!", "success");
+        window.history.replaceState(null, null, window.location.pathname);
+        setTimeout(() => {
+          showAuthView("login");
+        }, 1500);
+      } catch (err) {
+        console.error("Password update error:", err);
+        showStatus(err.message || "Error al actualizar contraseña.", "error");
+      }
+    });
+  }
+
+  // Dynamic transition helper
+  function transitionToApp(showApp) {
+    const landing = document.getElementById("landing-container");
+    const app = document.querySelector(".app-container");
+    
+    if (showApp) {
+      if (landing && !landing.classList.contains("hidden")) {
+        landing.classList.add("fade-out-active");
+        setTimeout(() => {
+          landing.classList.add("hidden");
+          landing.classList.remove("fade-out-active");
+          
+          if (app) {
+            app.classList.remove("hidden");
+            app.classList.add("fade-in-active");
+            setTimeout(() => {
+              app.classList.remove("fade-in-active");
+            }, 400);
+          }
+        }, 400);
+      } else {
+        if (landing) landing.classList.add("hidden");
+        if (app) app.classList.remove("hidden");
+      }
+    } else {
+      if (app && !app.classList.contains("hidden")) {
+        app.classList.add("fade-out-active");
+        setTimeout(() => {
+          app.classList.add("hidden");
+          app.classList.remove("fade-out-active");
+          
+          if (landing) {
+            landing.classList.remove("hidden");
+            landing.classList.add("fade-in-active");
+            setTimeout(() => {
+              landing.classList.remove("fade-in-active");
+            }, 400);
+          }
+        }, 400);
+      } else {
+        if (app) app.classList.add("hidden");
+        if (landing) landing.classList.remove("hidden");
+      }
+    }
+  }
+
+  // 6. UPDATE UI STATUS
+  function updateAuthUI(user) {
+    const loggedOutDiv = document.getElementById("auth-logged-out");
+    const loggedInDiv = document.getElementById("auth-logged-in");
+    const nameSpan = document.getElementById("auth-user-name");
+    
+    if (user) {
+      if (loggedOutDiv) loggedOutDiv.style.display = "none";
+      if (loggedInDiv) loggedInDiv.style.display = "flex";
+      if (nameSpan) {
+        const username = user.user_metadata?.username || user.user_metadata?.display_name || user.email;
+        nameSpan.textContent = username;
+      }
+      transitionToApp(true);
+    } else {
+      if (loggedInDiv) loggedInDiv.style.display = "none";
+      if (loggedOutDiv) loggedOutDiv.style.display = "flex";
+      if (nameSpan) nameSpan.textContent = "";
+      transitionToApp(false);
+    }
+  }
+
+  // 7. LISTEN TO SESSION AND URL REDIRECTS
+  client.auth.getSession().then(({ data: { session } }) => {
+    currentUser = session ? session.user : null;
+    currentSessionToken = session ? session.access_token : null;
+    updateAuthUI(currentUser);
+    updateUserFeaturesUI();
+  });
+
+  client.auth.onAuthStateChange((event, session) => {
+    currentUser = session ? session.user : null;
+    currentSessionToken = session ? session.access_token : null;
+    updateAuthUI(currentUser);
+    updateUserFeaturesUI();
+    
+    if (event === "PASSWORD_RECOVERY") {
+      showAuthView("reset");
+    }
+  });
+
+  // Check URL hash for recovery state fallback
+  const hash = window.location.hash;
+  if (hash && hash.includes("type=recovery")) {
+    showAuthView("reset");
+  }
+}
+
+/* ==========================================================================
+   USER ACC VALUE AND GAMIFICATION FEATURES
+   ========================================================================== */
+
+function updateUserFeaturesUI() {
+  const isLoggedIn = !!currentUser;
+  
+  // Enable / disable buttons
+  const btnSaveFav = document.getElementById("btn-save-favorite");
+  const txtNotes = document.getElementById("textarea-private-notes");
+  const btnVoteA = document.getElementById("btn-vote-a");
+  const btnVoteDraw = document.getElementById("btn-vote-draw");
+  const btnVoteB = document.getElementById("btn-vote-b");
+  const btnSubmitPronostic = document.getElementById("btn-submit-pronostic");
+  const btnSavePreset = document.getElementById("btn-save-preset");
+  const userPresetsRow = document.getElementById("user-presets-row");
+  const txtStatus = document.getElementById("user-actions-status");
+
+  if (btnSaveFav) btnSaveFav.disabled = !isLoggedIn;
+  if (txtNotes) txtNotes.disabled = !isLoggedIn;
+  if (btnVoteA) btnVoteA.disabled = !isLoggedIn;
+  if (btnVoteDraw) btnVoteDraw.disabled = !isLoggedIn;
+  if (btnVoteB) btnVoteB.disabled = !isLoggedIn;
+  if (btnSubmitPronostic) btnSubmitPronostic.disabled = !isLoggedIn;
+  if (btnSavePreset) btnSavePreset.disabled = !isLoggedIn;
+  
+  if (userPresetsRow) {
+    userPresetsRow.style.display = isLoggedIn ? "flex" : "none";
+  }
+
+  if (txtStatus) {
+    if (isLoggedIn) {
+      const username = currentUser.user_metadata?.username || currentUser.user_metadata?.display_name || currentUser.email;
+      txtStatus.innerHTML = `Conectado como <strong>${username}</strong>`;
+      // Load their features
+      loadUserPresets();
+      loadPollData();
+      loadUserPronosticStatus();
+    } else {
+      txtStatus.textContent = "Iniciar sesión para guardar favoritos y pronósticos.";
+      if (userPresetsRow) userPresetsRow.innerHTML = "";
+      const resultsCont = document.getElementById("poll-results-container");
+      if (resultsCont) resultsCont.classList.add("hidden");
+    }
+  }
+}
+
+// ----------------------------------------------------
+// CUSTOM PRESETS JS
+// ----------------------------------------------------
+async function loadUserPresets() {
+  if (!currentSessionToken) return;
+  try {
+    const res = await fetch("/api/user/presets", {
+      headers: { "Authorization": `Bearer ${currentSessionToken}` }
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      renderUserPresetsRow(json.presets);
+      renderUserPresetsList(json.presets);
+    }
+  } catch (err) {
+    console.error("Error loading user presets:", err);
+  }
+}
+
+function renderUserPresetsRow(presets) {
+  const row = document.getElementById("user-presets-row");
+  if (!row) return;
+  row.innerHTML = "";
+  
+  if (!presets || presets.length === 0) {
+    row.style.display = "none";
+    return;
+  }
+  
+  row.style.display = "flex";
+  
+  presets.forEach(p => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-secondary preset-btn";
+    btn.style = "padding: 3px 8px; font-size: 0.7rem; height: auto; min-height: unset; line-height: 1.2; border-color: var(--color-primary); background: rgba(99,102,241,0.05); color: var(--color-primary); margin-right: 4px; margin-bottom: 4px;";
+    btn.textContent = p.preset_name;
+    btn.addEventListener("click", () => {
+      const wFifa = document.getElementById("input-weight-fifa");
+      const wH2h = document.getElementById("input-weight-h2h");
+      const decay = document.getElementById("input-decay");
+      const ovrA = document.getElementById("input-override-a");
+      const ovrB = document.getElementById("input-override-b");
+      const altitude = document.getElementById("input-altitude");
+      
+      if (wFifa) wFifa.value = p.fifa_weight;
+      if (wH2h) wH2h.value = p.h2h_weight;
+      if (decay) decay.value = p.decay;
+      if (ovrA) ovrA.value = p.override_a;
+      if (ovrB) ovrB.value = p.override_b;
+      if (altitude) altitude.value = p.altitude;
+      
+      updateMatchCard(true);
+      updateWeightsPreview();
+      
+      // Auto run simulation if results visible
+      const resultsTabHeader = document.getElementById("results-tab-header");
+      if (resultsTabHeader && !resultsTabHeader.classList.contains("hidden")) {
+        runPredictionFlow();
+      }
+    });
+    row.appendChild(btn);
+  });
+}
+
+function renderUserPresetsList(presets) {
+  const container = document.getElementById("user-presets-list-container");
+  if (!container) return;
+  container.innerHTML = "";
+  
+  if (!presets || presets.length === 0) {
+    container.innerHTML = `
+      <div class="no-matches-message" style="text-align: center; color: var(--color-text-secondary); padding: 24px;">
+        No has guardado ningún preset personalizado de ponderación.
+      </div>
+    `;
+    return;
+  }
+  
+  presets.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "glass-card";
+    card.style = "padding: 12px; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border-color: var(--card-border-inner); margin-bottom: 8px;";
+    card.innerHTML = `
+      <div>
+        <h4 style="margin: 0; color: var(--color-primary); font-size: 0.9rem;">${p.preset_name}</h4>
+        <span style="font-size: 0.72rem; color: var(--color-text-secondary);">
+          FIFA: ${p.fifa_weight}% | H2H: ${p.h2h_weight}% | Decay: ${p.decay}m | Override: ${p.override_a}x / ${p.override_b}x | Alt: ${p.altitude}m
+        </span>
+      </div>
+      <button class="btn" style="padding: 4px 8px; font-size: 0.7rem; background: #dc2626; color: white; border: none; border-radius: 4px; height: auto; min-height: unset; cursor: pointer;">
+        Eliminar
+      </button>
+    `;
+    
+    card.querySelector("button").addEventListener("click", async () => {
+      if (confirm(`¿Estás seguro de que deseas eliminar el preset "${p.preset_name}"?`)) {
+        try {
+          const res = await fetch(`/api/user/presets/${p.id}`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${currentSessionToken}` }
+          });
+          const json = await res.json();
+          if (json.status === "success") {
+            loadUserPresets();
+          }
+        } catch (err) {
+          console.error("Error deleting preset:", err);
+        }
+      }
+    });
+    
+    container.appendChild(card);
+  });
+}
+
+// ----------------------------------------------------
+// FAVORITES JS
+// ----------------------------------------------------
+async function loadUserFavorites() {
+  if (!currentSessionToken) return;
+  try {
+    const res = await fetch("/api/user/favorites", {
+      headers: { "Authorization": `Bearer ${currentSessionToken}` }
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      renderUserFavorites(json.favorites);
+    }
+  } catch (err) {
+    console.error("Error loading favorites:", err);
+  }
+}
+
+function renderUserFavorites(favorites) {
+  const container = document.getElementById("favorites-list-container");
+  if (!container) return;
+  container.innerHTML = "";
+  
+  if (!favorites || favorites.length === 0) {
+    container.innerHTML = `
+      <div class="no-matches-message" style="text-align: center; color: var(--color-text-secondary); padding: 24px;">
+        No has guardado ningún partido en favoritos todavía. Haz clic en "⭐ Guardar en Favoritos" al simular un partido.
+      </div>
+    `;
+    return;
+  }
+  
+  favorites.forEach(f => {
+    const metaA = TEAM_METADATA[f.team_a] || { name: f.team_a.toUpperCase(), flag: "🏳️" };
+    const metaB = TEAM_METADATA[f.team_b] || { name: f.team_b.toUpperCase(), flag: "🏳️" };
+    
+    const card = document.createElement("div");
+    card.className = "glass-card";
+    card.style = "padding: 14px; background: rgba(255,255,255,0.015); border-color: var(--card-border-inner); display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;";
+    
+    const d = new Date(f.created_at);
+    const dateStr = d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--color-text-secondary);">
+        <span>Guardado el ${dateStr}</span>
+        <button class="btn-delete-fav" style="background: none; border: none; color: #ef4444; font-size: 0.72rem; cursor: pointer; padding: 0;">🗑️ Quitar</button>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 600; font-size: 0.92rem; color: white;">${metaA.flag} ${metaA.name} vs ${metaB.flag} ${metaB.name}</span>
+        <span class="badge" style="font-size: 0.78rem;">${f.xg_a.toFixed(1)} - ${f.xg_b.toFixed(1)} xG</span>
+      </div>
+      <div style="font-size: 0.78rem; color: var(--color-text-secondary);">
+        Probabilidades: ${metaA.name.slice(0,5)} ${(f.prob_a*100).toFixed(0)}% / Emp ${(f.prob_draw*100).toFixed(0)}% / ${metaB.name.slice(0,5)} ${(f.prob_b*100).toFixed(0)}%
+      </div>
+      ${f.notes ? `
+        <div style="background: rgba(0,0,0,0.15); padding: 8px 10px; border-radius: 6px; border-left: 2px solid var(--color-primary); font-size: 0.8rem; color: var(--color-text-primary); margin-top: 4px; white-space: pre-wrap;">
+          <strong>Notas:</strong> ${f.notes}
+        </div>
+      ` : ''}
+    `;
+    
+    card.querySelector(".btn-delete-fav").addEventListener("click", async () => {
+      try {
+        const res = await fetch(`/api/user/favorites/${f.id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${currentSessionToken}` }
+        });
+        const json = await res.json();
+        if (json.status === "success") {
+          loadUserFavorites();
+        }
+      } catch (err) {
+        console.error("Error deleting favorite:", err);
+      }
+    });
+    
+    container.appendChild(card);
+  });
+}
+
+// ----------------------------------------------------
+// COMMUNITY POLL & GUESSES JS
+// ----------------------------------------------------
+async function loadPollData() {
+  try {
+    const authHeaders = currentSessionToken ? { "Authorization": `Bearer ${currentSessionToken}` } : {};
+    const res = await fetch(`/api/match/vote/${selectedTeamA}/${selectedTeamB}`, {
+      headers: authHeaders
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      renderPollResults(json.stats, json.user_vote);
+    }
+  } catch (err) {
+    console.error("Error loading poll stats:", err);
+  }
+}
+
+function renderPollResults(stats, userVote) {
+  const pollResults = document.getElementById("poll-results-container");
+  const btnA = document.getElementById("btn-vote-a");
+  const btnDraw = document.getElementById("btn-vote-draw");
+  const btnB = document.getElementById("btn-vote-b");
+  
+  if (!pollResults) return;
+  pollResults.classList.remove("hidden");
+  
+  const lblA = document.getElementById("poll-lbl-a");
+  const lblDraw = document.getElementById("poll-lbl-draw");
+  const lblB = document.getElementById("poll-lbl-b");
+  
+  const barA = document.getElementById("poll-bar-a");
+  const barDraw = document.getElementById("poll-bar-draw");
+  const barB = document.getElementById("poll-bar-b");
+  
+  const pA = stats.percentages.A;
+  const pDraw = stats.percentages.Draw;
+  const pB = stats.percentages.B;
+  const total = stats.total;
+  
+  const metaA = TEAM_METADATA[selectedTeamA] || { name: selectedTeamA.toUpperCase() };
+  const metaB = TEAM_METADATA[selectedTeamB] || { name: selectedTeamB.toUpperCase() };
+  
+  if (lblA) lblA.textContent = `Gana ${metaA.name}: ${pA}% (${stats.votes.A} votos)`;
+  if (lblDraw) lblDraw.textContent = `Empate: ${pDraw}% (${stats.votes.Draw} votos)`;
+  if (lblB) lblB.textContent = `Gana ${metaB.name}: ${pB}% (${stats.votes.B} votos)`;
+  
+  if (barA) barA.style.width = `${pA}%`;
+  if (barDraw) barDraw.style.width = `${pDraw}%`;
+  if (barB) barB.style.width = `${pB}%`;
+  
+  // Highlight user vote
+  [btnA, btnDraw, btnB].forEach(btn => {
+    if (btn) {
+      btn.classList.remove("active", "btn-primary");
+      btn.classList.add("btn-secondary");
+    }
+  });
+  
+  if (userVote === "A" && btnA) {
+    btnA.classList.add("active", "btn-primary");
+    btnA.classList.remove("btn-secondary");
+  } else if (userVote === "Draw" && btnDraw) {
+    btnDraw.classList.add("active", "btn-primary");
+    btnDraw.classList.remove("btn-secondary");
+  } else if (userVote === "B" && btnB) {
+    btnB.classList.add("active", "btn-primary");
+    btnB.classList.remove("btn-secondary");
+  }
+}
+
+async function loadUserPronosticStatus() {
+  if (!currentSessionToken) return;
+  const btn = document.getElementById("btn-submit-pronostic");
+  if (!btn) return;
+  
+  try {
+    const res = await fetch(`/api/match/pronostic/${selectedTeamA}/${selectedTeamB}`, {
+      headers: { "Authorization": `Bearer ${currentSessionToken}` }
+    });
+    const json = await res.json();
+    if (json.status === "success" && json.pronostic) {
+      btn.disabled = true;
+      let guessText = json.pronostic.guess === "A" ? "Local" : json.pronostic.guess === "B" ? "Visitante" : "Empate";
+      btn.textContent = `🎯 Pronóstico Oficial: ${guessText}`;
+      btn.style.background = "rgba(99,102,241,0.15)";
+      btn.style.color = "var(--color-primary)";
+      btn.style.border = "1px solid var(--color-primary)";
+    } else {
+      btn.disabled = false;
+      btn.textContent = "🎯 Guardar Pronóstico Oficial (Leaderboard)";
+      btn.style.background = "var(--color-primary)";
+      btn.style.color = "white";
+      btn.style.border = "none";
+    }
+  } catch (err) {
+    console.error("Error loading user pronostic status:", err);
+  }
+}
+
+// ----------------------------------------------------
+// LEADERBOARD JS
+// ----------------------------------------------------
+async function loadLeaderboard() {
+  try {
+    const res = await fetch("/api/leaderboard");
+    const json = await res.json();
+    if (json.status === "success") {
+      renderLeaderboard(json.leaderboard);
+    }
+  } catch (err) {
+    console.error("Error loading leaderboard:", err);
+  }
+}
+
+function renderLeaderboard(rankings) {
+  const tbody = document.getElementById("leaderboard-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  
+  if (!rankings || rankings.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="3" style="padding: 24px; text-align: center; color: var(--color-text-secondary);">
+          Aún no hay puntuaciones registradas. ¡Sé el primero en guardar tu pronóstico oficial!
+        </td>
+      </tr>
+    `;
+    return;
+  }
+  
+  rankings.forEach((r, idx) => {
+    const pos = idx + 1;
+    let posHtml = pos;
+    if (pos === 1) posHtml = "🥇";
+    else if (pos === 2) posHtml = "🥈";
+    else if (pos === 3) posHtml = "🥉";
+    
+    const row = document.createElement("tr");
+    row.style = "border-bottom: 1px solid rgba(255,255,255,0.03);";
+    row.innerHTML = `
+      <td style="padding: 10px; font-weight: 700; font-size: 1rem;">${posHtml}</td>
+      <td style="padding: 10px; font-weight: 600; color: white;">${r.username}</td>
+      <td style="padding: 10px; text-align: right; font-weight: 700; color: var(--color-primary); font-family: var(--font-family-mono);">${r.points} pts</td>
+    `;
+    tbody.appendChild(row);
+  });
 }
