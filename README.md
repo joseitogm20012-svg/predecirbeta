@@ -1,182 +1,175 @@
-# 🏆 World Cup 2026 Prediction Model
+# JLY Predictor
 
-An open-source statistical model that forecasts **2026 FIFA World Cup** matches and title odds —
-**Elo ratings → Dixon-Coles bivariate Poisson → Monte Carlo simulation**. No machine-learning
-black box, no scraped bookmaker odds: just transparent, reproducible football maths.
+Simulador estadístico de partidos del **Mundial 2026** con modelo transparente, comunidad de pronosticadores y panel de administración.
 
-**▶ Live predictions (full 48-team, 50,000-simulation model):** **https://cup26matches.com**
-· [How it works / methodology](https://cup26matches.com/en/methodology/)
-· [Live insight feed](https://cup26matches.com/en/live/)
-· [Interactive bracket simulator](https://cup26matches.com/en/simulator/)
-
-> 🔴 **The tournament is LIVE (Jun 11 – Jul 19).** The production model now **conditions on real
-> results**: finished matches are locked, eliminated teams collapse to 0%, the actual bracket
-> (incl. the new best-third qualification, solved with bipartite matching) is used, and only the
-> remaining matches are simulated — re-run automatically within minutes of every full-time whistle.
->
-> This repo open-sources the **core match model + our honest backtest** so you can run, inspect
-> and reproduce the numbers.
+Combina **Elo calibrado**, **Poisson bivariado Dixon-Coles** y **simulación Monte Carlo** (hasta 100.000 iteraciones) con capas propias: xG por selección, historial directo (H2H), ranking FIFA, altitud, ventaja de sede WC 2026 y overrides manuales de fuerza.
 
 ---
 
-## Why it's worth a look
+## Qué incluye la plataforma
 
-It's tested the honest way — **walk-forward, out-of-sample** on **913 real internationals**
-(Oct 2023 – Jun 2026). Every match is predicted using only data available *before* kickoff, then
-scored against the actual result — with **proper scoring rules** (RPS, log-loss, Brier), not just
-accuracy, because accuracy alone rewards lucky guessing. Reproduce it yourself in one command:
+| Módulo | Descripción |
+|--------|-------------|
+| **Simulador** | Probabilidades 1X2, marcadores más probables, mercados de goles y análisis de valor vs cuotas |
+| **Cuentas de usuario** | Registro/login con Supabase Auth, favoritos, presets personalizados, votos y pronósticos |
+| **Leaderboard** | Ranking de usuarios que compiten contra el modelo durante el torneo |
+| **Análisis IA** | Informes tácticos por partido, gestionados desde el panel admin |
+| **Backtest** | Evaluación walk-forward reproducible con RPS, log-loss, Brier y calibración |
+
+---
+
+## Stack técnico
+
+```
+Frontend (HTML/CSS/JS)  →  FastAPI (Python)  →  Supabase
+                              ↓
+                    Postgres (producción) / SQLite (local)
+```
+
+- **Hosting:** [Render](https://render.com) — Web Service con Uvicorn  
+- **Auth:** Supabase Auth (JWT)  
+- **Base de datos app:** Supabase Postgres en producción (`DATABASE_URL`); SQLite local en desarrollo  
+- **Motor estadístico:** Python (`predictor.py`) + scripts Node auxiliares (`backtest.mjs`, `calibrate.mjs`)
+
+---
+
+## Inicio rápido (local)
+
+### Requisitos
+
+- Python 3.10+
+- Node.js 18+ (solo para backtest/calibración CLI)
+- Cuenta Supabase con Auth habilitado
+
+### 1. Clonar e instalar
 
 ```bash
-node backtest.mjs
+git clone <tu-repo>
+cd predecirv2
+pip install -r requirements.txt
 ```
 
-| Metric (763 evaluated, 150 burn-in) | Model | Baseline |
-|---|---|---|
-| **Ranked Probability Score** (the football standard, ↓) | **0.175** | coin-flip 0.241 |
-| Log-loss (↓) | **0.89** | coin-flip 1.10 |
-| Brier score (↓) | **0.52** | coin-flip 0.67 |
-| **Expected Calibration Error** (↓) | **2.3%** | < 5% = well-calibrated |
-| Correct result (win/draw/loss) | **62%** | always-home 49% · coin-flip 33% |
-| When a clear favourite (p ≥ 50%) | **69%** | — |
-
-### Is it calibrated? (the chart that matters)
-
-A forecaster is honest when the things it calls "70%" happen about 70% of the time. Pooling every
-probability the model issued across the out-of-sample matches:
-
-| Model said | Actually happened | n |
-|---|---|---|
-| 5% | 7% | 225 |
-| 15% | 13% | 374 |
-| 26% | 24% | 804 |
-| 35% | 32% | 205 |
-| 45% | 54% | 200 |
-| 55% | 56% | 149 |
-| 65% | 67% | 136 |
-| 75% | 76% | 95 |
-| 85% | 85% | 100 |
-
-> _**Changelog** — Jun 11, 2026: Monte Carlo raised to **50,000 trials** (5× lower tail noise);
-> in-tournament conditioning is live; backtest extended with RPS + a reliability curve + ECE;
-> data refreshed through Jun 2026. · Jun 7: goal-model variance denominator 350→400; per-team
-> strength priors applied on the live site on top of this core model._
-
-No model is a crystal ball — football is high-variance and draws are genuinely hard. These are
-well-calibrated estimates, and we make **no claim to beat the betting market**.
-
-## 📊 Live track record (2026)
-
-The model's call on **every finished match** of the tournament, updated as it happens:
-
-<!-- TRACK-RECORD:START -->
-**14/24 correct picks (58%) · avg RPS 0.159** (coin-flip ≈ 0.245) · updated 2026-06-18
-
-| Date | Result | Model's pick | |
-|---|---|---|---|
-| 2026-06-17 | Ghana 1–0 Panama | Ghana 41% | ✅ |
-| 2026-06-17 | England 4–2 Croatia | England 52% | ✅ |
-| 2026-06-17 | Uzbekistan 1–3 Colombia | Colombia 65% | ✅ |
-| 2026-06-17 | Portugal 1–1 DR Congo | Portugal 71% | ❌ |
-| 2026-06-16 | Austria 3–1 Jordan | Austria 56% | ✅ |
-| 2026-06-16 | Argentina 3–0 Algeria | Argentina 68% | ✅ |
-| 2026-06-16 | Iraq 1–4 Norway | Norway 69% | ✅ |
-| 2026-06-16 | France 3–1 Senegal | France 55% | ✅ |
-| 2026-06-15 | Saudi Arabia 1–1 Uruguay | Uruguay 56% | ❌ |
-| 2026-06-15 | Spain 0–0 Cape Verde | Spain 83% | ❌ |
-| 2026-06-15 | Iran 2–2 New Zealand | Iran 54% | ❌ |
-| 2026-06-15 | Belgium 1–1 Egypt | Belgium 58% | ❌ |
-| 2026-06-14 | Sweden 5–1 Tunisia | Sweden 44% | ✅ |
-| 2026-06-14 | Netherlands 2–2 Japan | Netherlands 44% | ❌ |
-| 2026-06-14 | Ivory Coast 1–0 Ecuador | Ecuador 47% | ❌ |
-| 2026-06-14 | Germany 7–1 Curaçao | Germany 80% | ✅ |
-| 2026-06-13 | Australia 2–0 Turkey | Australia 40% | ✅ |
-| 2026-06-12 | USA 4–1 Paraguay | USA 60% | ✅ |
-| 2026-06-13 | Haiti 0–1 Scotland | Scotland 51% | ✅ |
-| 2026-06-13 | Brazil 1–1 Morocco | Brazil 45% | ❌ |
-| 2026-06-13 | Qatar 1–1 Switzerland | Switzerland 62% | ❌ |
-| 2026-06-12 | Canada 1–1 Bosnia & Herzegovina | Canada 59% | ❌ |
-| 2026-06-11 | South Korea 2–1 Czech Republic | South Korea 49% | ✅ |
-| 2026-06-11 | Mexico 2–0 South Africa | Mexico 71% | ✅ |
-
-_Every call is listed — hits and misses. Probabilities are the model's frozen pre-match numbers (ratings don't re-fit mid-tournament), so nothing here is retro-fitted. Reproduce with `node track-record.mjs`._
-<!-- TRACK-RECORD:END -->
-
-## 🧩 Embeddable widgets & open data
-
-Run a blog, forum or fan site? The live model is embeddable — free, auto-updating all tournament:
-
-```html
-<!-- Live title-race board (top-10 championship odds, 50k sims) -->
-<iframe src="https://cup26matches.com/embed/title-race/" width="100%" height="430"
-  style="border:0;border-radius:12px" loading="lazy" title="World Cup 2026 title odds"></iframe>
-
-<!-- Real-time next-match strip (live W/D/L, rotates at kickoff) -->
-<iframe src="https://cup26matches.com/embed/next-match/" width="100%" height="92"
-  style="border:0;border-radius:10px" loading="lazy" title="Next World Cup 2026 match"></iframe>
-```
-
-More widgets + copy-paste snippets: **[cup26matches.com/en/widgets](https://cup26matches.com/en/widgets/)**
-
-**Open data** (CC BY 4.0 — free to use/quote/chart with a link back): the full per-team tournament
-probabilities, regenerated after every match —
-[probabilities.json](https://cup26matches.com/data/probabilities.json) ·
-[probabilities.csv](https://cup26matches.com/data/probabilities.csv)
-
-## Quick start
-
-No dependencies. Node 18+.
+### 2. Configurar variables de entorno
 
 ```bash
-git clone https://github.com/Hicruben/world-cup-2026-prediction-model.git
-cd world-cup-2026-prediction-model
-
-node predict.mjs brazil argentina      # head-to-head probabilities
-node predict.mjs usa mexico usa        # 3rd arg = home team (host bonus)
-node backtest.mjs                      # reproduce the accuracy numbers
-node calibrate.mjs                     # rebuild ratings from data/results.json
+cp .env.example .env
 ```
 
-Example:
+Edita `.env` con tus credenciales de Supabase (ver sección [Variables de entorno](#variables-de-entorno)).
 
-```
-$ node predict.mjs spain germany
+### 3. Arrancar
 
-  spain (Elo 2074)  vs  germany (Elo 1927)   [neutral]
-
-  spain            win   53.2%  ████████████████
-  draw                   26.8%  ████████
-  germany          win   20.0%  ██████
+```bash
+python main.py
+# o en Windows:
+run.bat
 ```
 
-## How it works
+Abre **http://localhost:3000** · Panel admin: **http://localhost:3000/admin.html**
 
-1. **Team strength (Elo).** Each nation starts from a long-run prior, then is calibrated on
-   recent real internationals — wins over strong sides in important games move a rating more than
-   friendlies, and recent form outweighs old form. See [`calibrate.mjs`](./calibrate.mjs).
-2. **Each match (Dixon-Coles Poisson).** Ratings → expected goals → a Dixon-Coles bivariate
-   Poisson gives win/draw/loss probabilities. The Dixon-Coles correction fixes plain Poisson's
-   well-known under-count of low-scoring draws (0-0, 1-1). See [`elo.mjs`](./elo.mjs).
-3. **The tournament (Monte Carlo).** The live site plays all 104 matches **50,000 times** through
-   the real bracket to get championship & advancement odds — and, now the tournament is underway,
-   **locks every finished result** (real standings, real qualifiers, real bracket slots) and
-   simulates only what's left. Full write-up:
-   [cup26matches.com/methodology](https://cup26matches.com/en/methodology/).
+---
 
-## Files
+## Despliegue en Render + Supabase
 
-| File | What |
-|---|---|
-| `elo.mjs` | The match model — Elo, Dixon-Coles τ, Poisson, `matchProb`, `sampleMatch` |
-| `calibrate.mjs` | Build calibrated ratings from `data/results.json` |
-| `backtest.mjs` | Walk-forward out-of-sample evaluation (RPS, log-loss, Brier, ECE + reliability curve) |
-| `predict.mjs` | CLI head-to-head predictor |
-| `track-record.mjs` | Regenerates the live 2026 track-record table in this README |
-| `data/results.json` | 913 real international results (Oct 2023 – Jun 2026) |
-| `data/elo-calibrated.json` | Calibrated Elo for the 48 finalists |
-| `data/wc2026-results.json` | Finished 2026 World Cup matches (feeds the track record) |
-| `data/model-backtest.json` | Saved backtest metrics |
+### Supabase (una sola vez)
 
-## License
+1. Crea un proyecto en [supabase.com](https://supabase.com).  
+2. **Settings → API:** copia `Project URL`, `anon public` key y `service_role` key.  
+3. **Settings → Database → Connection string:** copia la URI del **Session pooler** (puerto 6543).  
+4. En **Authentication → Providers**, habilita Email (y los que necesites).  
+5. Las tablas de la app (`favorites`, `user_presets`, `match_votes`, `user_pronostics`, `leaderboard`, `ai_analyses`) se crean automáticamente al primer arranque del backend.
 
-MIT — see [LICENSE](./LICENSE). Built by [Cup26 AI](https://cup26matches.com). If you use it,
-a link back is appreciated. ⭐ the repo if you find it useful!
+### Render
+
+1. **New → Web Service** conectado a tu repositorio.  
+2. **Runtime:** Python 3  
+3. **Build command:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. **Start command:**
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port $PORT
+   ```
+5. Añade las variables de entorno del [`.env.example`](./.env.example) en el dashboard de Render (nunca subas `.env` al repo).
+
+> En producción, `DATABASE_URL` debe apuntar al Postgres de Supabase. Sin ella, Render usaría SQLite efímero y perderías datos entre redeploys.
+
+---
+
+## Variables de entorno
+
+| Variable | Obligatoria | Uso |
+|----------|-------------|-----|
+| `ADMIN_PASSWORD` | Sí (admin) | Contraseña del panel `/admin.html` |
+| `SUPABASE_URL` | Sí | URL del proyecto Supabase |
+| `SUPABASE_PUBLISHABLE_KEY` | Sí | Anon key — expuesta al frontend vía `/api/config` |
+| `SUPABASE_SECRET_KEY` | Sí (admin/users) | Service role — solo backend |
+| `DATABASE_URL` | Sí (producción) | Connection string Postgres de Supabase |
+| `PORT` | Auto en Render | Puerto del servidor (default `3000`) |
+
+Plantilla completa: [`.env.example`](./.env.example)
+
+---
+
+## Cómo funciona el modelo
+
+1. **Fuerza de equipo (Elo + xG + forma):** ratings calibrados con partidos internacionales reales, mezclados con xG por selección, ranking FIFA e historial H2H según ponderaciones del usuario.  
+2. **Cada partido (Dixon-Coles):** los goles esperados alimentan una matriz Poisson bivariada con corrección τ para empates bajos (0-0, 1-1).  
+3. **Monte Carlo:** se simulan N partidos virtuales para estabilizar probabilidades y mercados derivados (Over/Under, BTTS, etc.).  
+4. **Ajustes contextuales:** altitud, sede anfitriona WC 2026 (USA/México/Canadá) y multiplicadores manuales por equipo.
+
+### Scripts CLI (Node)
+
+```bash
+node predict.mjs brazil argentina      # head-to-head
+node backtest.mjs                      # métricas out-of-sample
+node calibrate.mjs                     # regenerar Elo desde data/results.csv
+```
+
+---
+
+## Estructura del proyecto
+
+| Archivo / carpeta | Rol |
+|-------------------|-----|
+| `main.py` | API FastAPI + archivos estáticos |
+| `predictor.py` | Modelo de simulación (Python) |
+| `db.py` | Capa de datos (SQLite / Postgres) |
+| `app.js` / `index.html` | Frontend del simulador |
+| `admin.html` / `admin.js` | Panel de administración |
+| `elo.mjs` / `backtest.mjs` | Motor estadístico CLI original |
+| `data/` | Resultados, Elo, xG, backtest |
+| `data/fetch_*.py` | Scripts para actualizar datos |
+
+---
+
+## Panel de administración
+
+Accede en `/admin.html` con la contraseña definida en `ADMIN_PASSWORD`.
+
+Desde ahí puedes:
+
+- Ver y gestionar **usuarios registrados** (planes FREE / PREMIUM vía Supabase Auth metadata)  
+- Crear, editar y eliminar **análisis tácticos** por partido  
+- Registrar cuotas de mercado opcionales junto a cada análisis  
+
+---
+
+## Tests
+
+```bash
+# CRUD de análisis IA (requiere ADMIN_PASSWORD en .env o entorno)
+set ADMIN_PASSWORD=tu_password   # Windows
+export ADMIN_PASSWORD=tu_password  # Linux/Mac
+python test_crud.py
+```
+
+---
+
+## Créditos
+
+El núcleo estadístico (Elo + Dixon-Coles + Poisson) se inspira en el modelo open source de [cup26matches.com](https://cup26matches.com).  
+**JLY Predictor** es una capa de producto propia: UI, auth, comunidad, admin y extensiones del modelo.
+
+Licencia: MIT — ver [LICENSE](./LICENSE).
