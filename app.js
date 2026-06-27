@@ -5258,3 +5258,375 @@ window.switchBetBuilderTab = function(activeTabName) {
   });
 };
 
+// ============================================
+// TEAM DETAILS MODAL FUNCTIONALITY
+// ============================================
+
+// Modal state
+let modalFormChart = null;
+let currentModalTeam = null;
+
+// Open modal function
+window.viewTeamDetails = async function() {
+  const teamA = document.getElementById('select-team-a')?.value;
+  const teamB = document.getElementById('select-team-b')?.value;
+  
+  // Determine which team to show (default to team A if both exist)
+  const teamName = teamA || teamB;
+  if (!teamName) {
+    alert('Por favor selecciona un equipo primero.');
+    return;
+  }
+  
+  currentModalTeam = teamName;
+  await loadTeamDetailsModal(teamName);
+};
+
+// Load team details into modal
+async function loadTeamDetailsModal(teamName) {
+  const overlay = document.getElementById('team-details-modal-overlay');
+  const modalContent = overlay.querySelector('.modal-content');
+  
+  // Show overlay with animation
+  overlay.style.display = 'block';
+  setTimeout(() => {
+    overlay.style.opacity = '1';
+    modalContent.style.transform = 'translate(-50%, -50%) translateY(0)';
+    modalContent.style.opacity = '1';
+  }, 10);
+  
+  // Set team name and flag
+  document.getElementById('modal-team-name').textContent = teamName;
+  const flag = getCountryFlag(teamName);
+  document.getElementById('modal-team-flag').textContent = flag;
+  
+  // Fetch team data from API
+  try {
+    const response = await fetch(`/api/team-details/${encodeURIComponent(teamName)}`);
+    if (!response.ok) throw new Error('Error fetching team data');
+    const data = await response.json();
+    
+    // Populate modal with data
+    populateModalData(data);
+  } catch (error) {
+    console.error('Error loading team details:', error);
+    // Use mock data for demonstration
+    populateModalData(getMockTeamData(teamName));
+  }
+}
+
+// Populate modal with team data
+function populateModalData(data) {
+  // Rank & Elo
+  document.getElementById('modal-fifa-rank').textContent = `#${data.fifaRank || '-'}`;
+  document.getElementById('modal-elo-rating').textContent = data.eloRating || '-';
+  document.getElementById('modal-record').textContent = `${data.wins}V-${data.draws}E-${data.losses}D`;
+  
+  // Form badges
+  const formBadgesContainer = document.getElementById('modal-form-badges');
+  formBadgesContainer.innerHTML = '';
+  data.formResults.forEach(result => {
+    const badge = document.createElement('span');
+    badge.className = `bb-form-badge ${result === 'W' ? 'win' : result === 'D' ? 'draw' : 'loss'}`;
+    badge.textContent = result;
+    badge.style.fontSize = '0.75rem';
+    badge.style.padding = '4px 8px';
+    formBadgesContainer.appendChild(badge);
+  });
+  
+  // Form chart
+  renderModalFormChart(data.formGoals);
+  
+  // Offensive stats
+  document.getElementById('modal-goals-for').textContent = data.goalsFor;
+  document.getElementById('modal-gf-avg').textContent = data.gfAvg.toFixed(1);
+  document.getElementById('modal-clean-sheets').textContent = `${data.cleanSheets}%`;
+  
+  // Defensive stats
+  document.getElementById('modal-goals-against').textContent = data.goalsAgainst;
+  document.getElementById('modal-gc-avg').textContent = data.gcAvg.toFixed(1);
+  document.getElementById('modal-btts').textContent = `${data.btts}%`;
+  
+  // Top scorers
+  const scorersContainer = document.getElementById('modal-top-scorers');
+  scorersContainer.innerHTML = '';
+  data.topScorers.forEach((scorer, index) => {
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(255,255,255,0.02); border-radius: 8px;';
+    row.innerHTML = `
+      <span style="font-size: 0.85rem; color: var(--color-text-secondary);">
+        ${index + 1}. ${scorer.name} ${scorer.active ? '<span style="color: #10b981; font-size: 0.7rem;">🟢</span>' : '<span style="color: #6b7280; font-size: 0.7rem;">⚫</span>'}
+      </span>
+      <span style="font-weight: 700; color: #f59e0b;">${scorer.goals} goles</span>
+    `;
+    scorersContainer.appendChild(row);
+  });
+  
+  // Competition stats
+  const compContainer = document.getElementById('modal-competition-stats');
+  compContainer.innerHTML = '';
+  Object.entries(data.competitionStats).forEach(([comp, record]) => {
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.style.cssText = 'display: flex; justify-content: space-between; padding: 10px 12px; background: rgba(255,255,255,0.02); border-radius: 8px;';
+    row.innerHTML = `
+      <span style="font-size: 0.85rem; color: var(--color-text-secondary);">${comp}</span>
+      <span style="font-weight: 700; color: var(--color-primary);">${record}</span>
+    `;
+    compContainer.appendChild(row);
+  });
+}
+
+// Render form chart in modal
+function renderModalFormChart(formGoals) {
+  const ctx = document.getElementById('modal-form-chart').getContext('2d');
+  
+  if (modalFormChart) {
+    modalFormChart.destroy();
+  }
+  
+  const isDarkTheme = !document.body.classList.contains('light-theme');
+  const textColor = isDarkTheme ? '#94a3b8' : '#475569';
+  const gridColor = isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  
+  modalFormChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: formGoals.map((_, i) => `P${i + 1}`),
+      datasets: [{
+        label: 'Goles',
+        data: formGoals,
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#f59e0b',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDarkTheme ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+          titleColor: isDarkTheme ? '#f8fafc' : '#0f172a',
+          bodyColor: isDarkTheme ? '#94a3b8' : '#475569',
+          borderColor: isDarkTheme ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+          borderWidth: 1,
+          padding: 12,
+          displayColors: false
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: textColor, font: { size: 10 } },
+          grid: { color: gridColor, display: false }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: textColor, font: { size: 10 }, stepSize: 1 },
+          grid: { color: gridColor }
+        }
+      }
+    }
+  });
+}
+
+// Close modal function
+function closeModal() {
+  const overlay = document.getElementById('team-details-modal-overlay');
+  const modalContent = overlay.querySelector('.modal-content');
+  
+  overlay.style.opacity = '0';
+  modalContent.style.transform = 'translate(-50%, -50%) translateY(20px)';
+  modalContent.style.opacity = '0';
+  
+  setTimeout(() => {
+    overlay.style.display = 'none';
+  }, 300);
+}
+
+// Event listeners for modal
+document.addEventListener('DOMContentLoaded', () => {
+  const closeBtn = document.getElementById('btn-close-modal');
+  const overlay = document.getElementById('team-details-modal-overlay');
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeModal);
+  }
+  
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeModal();
+      }
+    });
+  }
+  
+  // Close on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const overlay = document.getElementById('team-details-modal-overlay');
+      if (overlay && overlay.style.display !== 'none') {
+        closeModal();
+      }
+    }
+  });
+});
+
+// Mock data for demonstration (used when API fails)
+function getMockTeamData(teamName) {
+  return {
+    fifaRank: Math.floor(Math.random() * 30) + 1,
+    eloRating: Math.floor(Math.random() * 500) + 1600,
+    wins: Math.floor(Math.random() * 6) + 4,
+    draws: Math.floor(Math.random() * 4),
+    losses: Math.floor(Math.random() * 3),
+    formResults: ['W', 'W', 'D', 'W', 'L', 'W', 'D', 'W', 'W', 'L'],
+    formGoals: [2, 3, 1, 2, 0, 1, 1, 3, 2, 0],
+    goalsFor: Math.floor(Math.random() * 15) + 10,
+    gfAvg: 1.8,
+    cleanSheets: Math.floor(Math.random() * 30) + 30,
+    goalsAgainst: Math.floor(Math.random() * 10) + 5,
+    gcAvg: 0.8,
+    btts: Math.floor(Math.random() * 30) + 40,
+    topScorers: [
+      { name: 'Jugador Estrella', goals: 8, active: true },
+      { name: 'Delantero Principal', goals: 5, active: true },
+      { name: 'Mediocampista', goals: 3, active: true }
+    ],
+    competitionStats: {
+      'Eliminatorias': '4V-2E-1D',
+      'Amistosos': '2V-1E-0D',
+      'Copa América': '3V-1E-1D'
+    }
+  };
+}
+
+// Helper function to get country flag emoji
+function getCountryFlag(countryName) {
+  const flagMap = {
+    'Argentina': '🇦🇷',
+    'Uruguay': '🇺🇾',
+    'Brasil': '🇧🇷',
+    'Alemania': '🇩🇪',
+    'Francia': '🇫🇷',
+    'España': '🇪🇸',
+    'Inglaterra': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    'Italia': '🇮🇹',
+    'México': '🇲🇽',
+    'Estados Unidos': '🇺🇸',
+    'Canadá': '🇨🇦',
+    'Colombia': '🇨🇴',
+    'Chile': '🇨🇱',
+    'Perú': '🇵🇪',
+    'Ecuador': '🇪🇨',
+    'Paraguay': '🇵🇾',
+    'Bolivia': '🇧🇴',
+    'Venezuela': '🇻🇪',
+    'Japón': '🇯🇵',
+    'Corea del Sur': '🇰🇷',
+    'Australia': '🇦🇺',
+    'Marruecos': '🇲🇦',
+    'Senegal': '🇸🇳',
+    'Nigeria': '🇳🇬',
+    'Egipto': '🇪🇬',
+    'Portugal': '🇵🇹',
+    'Países Bajos': '🇳🇱',
+    'Bélgica': '🇧🇪',
+    'Croacia': '🇭🇷',
+    'Suiza': '🇨🇭'
+  };
+  return flagMap[countryName] || '🏳️';
+}
+
+// ============================================
+// SLIDER ↔ INPUT SYNC FUNCTIONALITY
+// ============================================
+
+// Enhanced sync for FIFA weight slider and input
+const setupSliderInputSync = () => {
+  const sliderFifa = document.getElementById('slider-weight-fifa');
+  const inputFifa = document.getElementById('input-weight-fifa');
+  const sliderH2h = document.getElementById('slider-weight-h2h');
+  const inputH2h = document.getElementById('input-weight-h2h');
+  const sliderDecay = document.getElementById('slider-decay');
+  const inputDecay = document.getElementById('input-decay');
+  
+  // FIFA sync
+  if (sliderFifa && inputFifa) {
+    sliderFifa.addEventListener('input', (e) => {
+      inputFifa.value = e.target.value;
+      updateWeightsPreview();
+      validateWeightsSum();
+    });
+    inputFifa.addEventListener('input', (e) => {
+      let val = parseInt(e.target.value) || 0;
+      val = Math.max(0, Math.min(100, val));
+      sliderFifa.value = val;
+      updateWeightsPreview();
+      validateWeightsSum();
+    });
+  }
+  
+  // H2H sync
+  if (sliderH2h && inputH2h) {
+    sliderH2h.addEventListener('input', (e) => {
+      inputH2h.value = e.target.value;
+      updateWeightsPreview();
+      validateWeightsSum();
+    });
+    inputH2h.addEventListener('input', (e) => {
+      let val = parseInt(e.target.value) || 0;
+      val = Math.max(0, Math.min(100, val));
+      sliderH2h.value = val;
+      updateWeightsPreview();
+      validateWeightsSum();
+    });
+  }
+  
+  // Decay sync
+  if (sliderDecay && inputDecay) {
+    sliderDecay.addEventListener('input', (e) => {
+      inputDecay.value = e.target.value;
+      updateMatchCard(true);
+    });
+    inputDecay.addEventListener('input', (e) => {
+      let val = parseInt(e.target.value) || 18;
+      val = Math.max(3, Math.min(60, val));
+      sliderDecay.value = val;
+      updateMatchCard(true);
+    });
+  }
+};
+
+// Validate weights sum to 100%
+function validateWeightsSum() {
+  const fifaWeight = parseInt(document.getElementById('input-weight-fifa')?.value || '0');
+  const h2hWeight = parseInt(document.getElementById('input-weight-h2h')?.value || '0');
+  const formaWeight = 100 - fifaWeight - h2hWeight;
+  
+  const formulaPreview = document.getElementById('weights-formula-preview');
+  if (formulaPreview) {
+    const sum = fifaWeight + h2hWeight + formaWeight;
+    if (sum === 100 && fifaWeight >= 0 && h2hWeight >= 0 && formaWeight >= 0) {
+      formulaPreview.innerHTML = `Distribución Real: FIFA ${fifaWeight}% | H2H ${h2hWeight}% | Forma Histórica ${formaWeight}%`;
+      formulaPreview.style.color = 'var(--color-primary)';
+    } else {
+      formulaPreview.innerHTML = `⚠️ Suma inválida: ${sum}% (debe ser 100%)`;
+      formulaPreview.style.color = '#ef4444';
+    }
+  }
+}
+
+// Initialize slider-input sync on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+  setupSliderInputSync();
+});
+
+

@@ -4543,3 +4543,176 @@ body.light-theme .h2h-center-tabs {
   background: rgba(18,42,82,0.04);
   border-color: rgba(18,42,82,0.08);
 }
+
+/* ============================================ */
+/* TEAM DETAILS MODAL STYLES                    */
+/* ============================================ */
+
+.modal-overlay {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  animation: slideUp 0.3s ease forwards;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, -50%) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.btn-close-modal:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+.modal-section {
+  margin-bottom: 24px;
+}
+
+.modal-section h3 {
+  font-family: var(--font-family-title);
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.stat-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scorers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bb-form-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border-radius: 6px;
+  min-width: 28px;
+  height: 28px;
+  font-size: 0.75rem;
+}
+
+.bb-form-badge.win {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.bb-form-badge.draw {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.bb-form-badge.loss {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Light theme adjustments for modal */
+body.light-theme .modal-content {
+  background: #ffffff;
+}
+
+body.light-theme .stat-card,
+body.light-theme .stat-row {
+  background: rgba(18, 42, 82, 0.03);
+  border-color: rgba(18, 42, 82, 0.08);
+}
+
+body.light-theme .stat-row:hover {
+  background: rgba(18, 42, 82, 0.05);
+}
+
+body.light-theme .bb-form-badge.win {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+body.light-theme .bb-form-badge.draw {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+body.light-theme .bb-form-badge.loss {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+  
+  .modal-header {
+    padding: 16px 20px;
+  }
+  
+  .modal-body {
+    padding: 16px;
+  }
+  
+  #modal-team-title {
+    font-size: 1.25rem;
+  }
+  
+  #modal-team-flag {
+    font-size: 1.5rem;
+  }
+}
