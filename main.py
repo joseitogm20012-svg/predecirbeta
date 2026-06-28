@@ -18,8 +18,10 @@ if os.path.exists(".env"):
                 key, val = line.split("=", 1)
                 os.environ[key.strip()] = val.strip().strip('"').strip("'")
 
-from predictor import load_data, run_prediction_sim, get_team_history, get_h2h_stats
+from predictor import load_data, run_prediction_sim, get_team_history, get_h2h_stats, name_to_slug
 import db
+import csv
+from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -124,6 +126,141 @@ def get_h2h(team_a: str, team_b: str):
         return h2h
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading H2H stats: {str(e)}")
+
+@app.get("/api/team-details/{team_name}")
+def get_team_details(team_name: str, decay_months: int = 18):
+    """
+    Obtiene detalles completos de un equipo para el modal:
+    - Últimos 10 partidos
+    - Estadísticas ofensivas/defensivas
+    - Goleadores principales
+    - Rendimiento por competición
+    """
+    try:
+        matches, ratings = load_data()
+        team_slug = name_to_slug(team_name)
+        
+        # Obtener historial del equipo
+        history = get_team_history(team_slug, matches, ratings, decay_months)
+        
+        # Últimos 10 resultados (W/D/L)
+        last_10 = []
+        for h in history[:10]:
+            if h["goalsScored"] > h["goalsConceded"]:
+                last_10.append("W")
+            elif h["goalsScored"] == h["goalsConceded"]:
+                last_10.append("D")
+            else:
+                last_10.append("L")
+        
+        # Puntos por partido para gráfico (3=victoria, 1=empate, 0=derrota)
+        form_points = []
+        for h in history[:10]:
+            if h["goalsScored"] > h["goalsConceded"]:
+                form_points.append(3)
+            elif h["goalsScored"] == h["goalsConceded"]:
+                form_points.append(1)
+            else:
+                form_points.append(0)
+        
+        # Estadísticas ofensivas (últimos 10 partidos)
+        goals_for = sum(h["goalsScored"] for h in history[:10])
+        
+        # Estadísticas defensivas (últimos 10 partidos)
+        goals_against = sum(h["goalsConceded"] for h in history[:10])
+        clean_sheets = sum(1 for h in history[:10] if h["goalsConceded"] == 0)
+        clean_sheets_pct = round((clean_sheets / len(history[:10])) * 100) if history else 0
+        
+        # Cargar datos de xG si existen
+        xg_by_team_path = os.path.join(BASE_DIR, "data", "xg_by_team.json")
+        xg_for = 0.0
+        shots_for = 0.0
+        xg_against = 0.0
+        shots_against = 0.0
+        
+        if os.path.exists(xg_by_team_path):
+            with open(xg_by_team_path, "r", encoding="utf-8") as f:
+                xg_data = json.load(f)
+                teams_data = xg_data.get("teams", {})
+                team_xg = teams_data.get(team_slug, {})
+                xg_for = team_xg.get("xg_overall", 0.0)
+                xg_against = team_xg.get("xga_overall", 0.0)
+                shots_for = team_xg.get("shots_per_90", 0.0)
+                # shots_against no está disponible directamente, usamos un estimado
+                shots_against = team_xg.get("shots_per_90", 0.0) * 0.8  # Estimado
+        
+        # Cargar goleadores
+        scorers_path = os.path.join(BASE_DIR, "data", "goalscorers.csv")
+        top_scorers = []
+        
+        if os.path.exists(scorers_path):
+            scorer_counts = defaultdict(int)
+            with open(scorers_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row["team"] == team_name and not row.get("own_goal", "FALSE").upper() == "TRUE":
+                        scorer_counts[row["scorer"]] += 1
+            
+            # Ordenar por goles y tomar top 5
+            sorted_scorers = sorted(scorer_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+            top_scorers = [{"name": name, "goals": goals} for name, goals in sorted_scorers]
+        
+        # Rendimiento por competición
+        comp_records = defaultdict(lambda: {"wins": 0, "draws": 0, "losses": 0})
+        for h in history:
+            # Buscar el partido original para obtener torneo
+            for m in matches:
+                if m["id"] == h["id"]:
+                    tournament = m.get("tournament", "Otros")
+                    # Normalizar nombre de torneo
+                    if "Friendly" in tournament:
+                        tournament = "Amistosos"
+                    elif "Copa" in tournament or "Cup" in tournament:
+                        tournament = "Copa"
+                    elif "Eliminatoria" in tournament or "Qualifier" in tournament or "World Cup" in tournament:
+                        tournament = "Eliminatorias/Mundial"
+                    else:
+                        tournament = "Otros"
+                    
+                    if h["goalsScored"] > h["goalsConceded"]:
+                        comp_records[tournament]["wins"] += 1
+                    elif h["goalsScored"] == h["goalsConceded"]:
+                        comp_records[tournament]["draws"] += 1
+                    else:
+                        comp_records[tournament]["losses"] += 1
+                    break
+        
+        competitions = {}
+        for comp, rec in comp_records.items():
+            competitions[comp] = f"{rec['wins']}V-{rec['draws']}E-{rec['losses']}D"
+        
+        # Elo rating del equipo
+        elo_rating = ratings.get(team_slug, 1500)
+        
+        # FIFA ranking (aproximado basado en Elo)
+        sorted_ratings = sorted(ratings.items(), key=lambda x: x[1], reverse=True)
+        fifa_rank = next((i + 1 for i, (slug, _) in enumerate(sorted_ratings) if slug == team_slug), None)
+        
+        return {
+            "teamName": team_name,
+            "teamSlug": team_slug,
+            "fifaRank": fifa_rank,
+            "eloRating": round(elo_rating),
+            "last10Results": last_10,
+            "formPoints": form_points,
+            "goalsFor": goals_for,
+            "goalsAgainst": goals_against,
+            "xgFor": xg_for,
+            "xgAgainst": xg_against,
+            "shotsFor": shots_for,
+            "shotsAgainst": shots_against,
+            "cleanSheets": clean_sheets_pct,
+            "topScorers": top_scorers,
+            "competitions": competitions
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading team details: {str(e)}")
 
 @app.get("/api/backtest-metrics")
 def get_backtest_metrics():

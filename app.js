@@ -3270,3 +3270,333 @@ function renderLeaderboard(rankings) {
     tbody.appendChild(row);
   });
 }
+
+// ==========================================================================
+// TEAM DETAILS MODAL & WEIGHT SLIDER SYNC FUNCTIONALITY
+// ==========================================================================
+
+// Modal functionality
+const modalOverlay = document.getElementById('team-details-modal');
+const modalContainer = modalOverlay?.querySelector('.modal-container');
+const btnModalClose = modalOverlay?.querySelector('.btn-modal-close');
+const btnViewDetails = document.querySelectorAll('.btn-view-details');
+
+// Open modal function
+function openTeamModal(teamLetter) {
+  const selectId = teamLetter === 'a' ? 'select-team-a' : 'select-team-b';
+  const selectEl = document.getElementById(selectId);
+  if (!selectEl || !modalOverlay) return;
+  
+  const teamName = selectEl.value;
+  const teamFlag = getTeamFlag(teamName);
+  
+  // Populate modal with team data
+  document.getElementById('modal-team-name').textContent = teamName.toUpperCase();
+  document.getElementById('modal-team-flag').textContent = teamFlag;
+  
+  // Load team stats from API or calculate from data
+  loadTeamStats(teamName);
+  
+  // Show modal with animation
+  modalOverlay.classList.add('active');
+  modalOverlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+// Close modal function
+function closeTeamModal() {
+  if (!modalOverlay) return;
+  modalOverlay.classList.remove('active');
+  modalOverlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  
+  // Destroy chart if exists
+  if (window.modalFormChart) {
+    window.modalFormChart.destroy();
+    window.modalFormChart = null;
+  }
+}
+
+// Get team flag emoji
+function getTeamFlag(teamName) {
+  const flagMap = {
+    'Uruguay': '🇺🇾', 'Argentina': '🇦🇷', 'Brasil': '🇧🇷', 'México': '🇲🇽',
+    'Estados Unidos': '🇺🇸', 'Canadá': '🇨🇦', 'Colombia': '🇨🇴', 'Chile': '🇨🇱',
+    'Perú': '🇵🇪', 'Ecuador': '🇪🇨', 'Paraguay': '🇵🇾', 'Bolivia': '🇧🇴',
+    'Venezuela': '🇻🇪', 'Jamaica': '🇯🇲', 'Costa Rica': '🇨🇷', 'Panamá': '🇵🇦',
+    'Honduras': '🇭🇳', 'Guatemala': '🇬🇹', 'El Salvador': '🇸🇻', 'Trinidad y Tobago': '🇹🇹',
+    'España': '🇪🇸', 'Francia': '🇫🇷', 'Alemania': '🇩🇪', 'Italia': '🇮🇹',
+    'Inglaterra': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Portugal': '🇵🇹', 'Países Bajos': '🇳🇱', 'Bélgica': '🇧🇪',
+    'Croacia': '🇭🇷', 'Suiza': '🇨🇭', 'Dinamarca': '🇩🇰', 'Serbia': '🇷🇸',
+    'Polonia': '🇵🇱', 'Ucrania': '🇺🇦', 'Suecia': '🇸🇪', 'Noruega': '🇳🇴',
+    'Austria': '🇦🇹', 'República Checa': '🇨🇿', 'Rumania': '🇷🇴', 'Hungría': '🇭🇺',
+    'Turquía': '🇹🇷', 'Grecia': '🇬🇷', 'Escocia': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Gales': '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
+    'Irlanda': '🇮🇪', 'Islandia': '🇮🇸', 'Finlandia': '🇫🇮', 'Rusia': '🇷🇺',
+    'Japón': '🇯🇵', 'Corea del Sur': '🇰🇷', 'Australia': '🇦🇺', 'Arabia Saudita': '🇸🇦',
+    'Irán': '🇮🇷', 'Marruecos': '🇲🇦', 'Senegal': '🇸🇳', 'Nigeria': '🇳🇬',
+    'Camerún': '🇨🇲', 'Ghana': '🇬🇭', 'Egipto': '🇪🇬', 'Túnez': '🇹🇳',
+    'Argelia': '🇩🇿', 'Sudáfrica': '🇿🇦', 'Nueva Zelanda': '🇳🇿'
+  };
+  return flagMap[teamName] || '🏳️';
+}
+
+// Load team statistics
+async function loadTeamStats(teamName) {
+  try {
+    // Fetch team data from API endpoint
+    const response = await fetch(`/api/team-details/${encodeURIComponent(teamName)}`);
+    if (!response.ok) throw new Error('API error');
+    const data = await response.json();
+    
+    // Update rankings
+    document.getElementById('modal-fifa-rank').textContent = `#${data.fifaRank || 'N/A'}`;
+    document.getElementById('modal-elo-rating').textContent = data.eloRating || 'N/A';
+    
+    // Update form badges
+    const formBadgesContainer = document.getElementById('modal-form-badges');
+    formBadgesContainer.innerHTML = '';
+    const last10Results = data.last10Results || ['W','W','D','W','L','W','D','W','W','L'];
+    last10Results.forEach(result => {
+      const badge = document.createElement('span');
+      badge.className = `form-badge ${result.toLowerCase()}`;
+      badge.textContent = result;
+      formBadgesContainer.appendChild(badge);
+    });
+    
+    // Update offensive stats
+    document.getElementById('modal-goals-for').textContent = data.goalsFor || '0';
+    document.getElementById('modal-xg-for').textContent = (data.xgFor || 0).toFixed(1);
+    document.getElementById('modal-shots-for').textContent = (data.shotsFor || 0).toFixed(1);
+    
+    // Update defensive stats
+    document.getElementById('modal-goals-against').textContent = data.goalsAgainst || '0';
+    document.getElementById('modal-clean-sheets').textContent = `${data.cleanSheets || 0}%`;
+    document.getElementById('modal-shots-against').textContent = (data.shotsAgainst || 0).toFixed(1);
+    
+    // Update top scorers
+    const scorersList = document.getElementById('modal-top-scorers');
+    scorersList.innerHTML = '';
+    const topScorers = data.topScorers || [];
+    topScorers.slice(0, 5).forEach((scorer, idx) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="scorer-name">${idx + 1}. ${scorer.name}</span><span class="scorer-goals">${scorer.goals} goles</span>`;
+      scorersList.appendChild(li);
+    });
+    
+    // Update competition stats
+    const compStats = document.getElementById('modal-competition-stats');
+    compStats.innerHTML = '';
+    const competitions = data.competitions || {};
+    Object.entries(competitions).forEach(([compName, record]) => {
+      const div = document.createElement('div');
+      div.className = 'comp-stat-item';
+      div.innerHTML = `<span class="comp-name">${compName}</span><span class="comp-record">${record}</span>`;
+      compStats.appendChild(div);
+    });
+    
+    // Render form chart
+    renderFormChart(data.formPoints || [3,3,1,3,0,3,1,3,3,0]);
+    
+  } catch (err) {
+    console.error('Error loading team stats:', err);
+    // Fallback to mock data
+    loadMockTeamData(teamName);
+  }
+}
+
+// Mock data fallback
+function loadMockTeamData(teamName) {
+  document.getElementById('modal-fifa-rank').textContent = '#1';
+  document.getElementById('modal-elo-rating').textContent = '1922';
+  
+  const formBadgesContainer = document.getElementById('modal-form-badges');
+  formBadgesContainer.innerHTML = '';
+  ['W','W','D','W','L','W','D','W','W','L'].forEach(result => {
+    const badge = document.createElement('span');
+    badge.className = `form-badge ${result.toLowerCase()}`;
+    badge.textContent = result;
+    formBadgesContainer.appendChild(badge);
+  });
+  
+  document.getElementById('modal-goals-for').textContent = '18';
+  document.getElementById('modal-xg-for').textContent = '1.8';
+  document.getElementById('modal-shots-for').textContent = '14.2';
+  document.getElementById('modal-goals-against').textContent = '8';
+  document.getElementById('modal-clean-sheets').textContent = '40%';
+  document.getElementById('modal-shots-against').textContent = '9.1';
+  
+  const scorersList = document.getElementById('modal-top-scorers');
+  scorersList.innerHTML = `
+    <li><span class="scorer-name">1. Luis Suárez</span><span class="scorer-goals">5 goles</span></li>
+    <li><span class="scorer-name">2. Darwin Núñez</span><span class="scorer-goals">3 goles</span></li>
+    <li><span class="scorer-name">3. Federico Valverde</span><span class="scorer-goals">2 goles</span></li>
+  `;
+  
+  const compStats = document.getElementById('modal-competition-stats');
+  compStats.innerHTML = `
+    <div class="comp-stat-item"><span class="comp-name">Eliminatorias</span><span class="comp-record">4V-2E-1D</span></div>
+    <div class="comp-stat-item"><span class="comp-name">Amistosos</span><span class="comp-record">2V-1E-0D</span></div>
+  `;
+  
+  renderFormChart([3,3,1,3,0,3,1,3,3,0]);
+}
+
+// Render form chart
+function renderFormChart(dataPoints) {
+  const ctx = document.getElementById('modal-form-chart')?.getContext('2d');
+  if (!ctx) return;
+  
+  if (window.modalFormChart) {
+    window.modalFormChart.destroy();
+  }
+  
+  window.modalFormChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10'],
+      datasets: [{
+        label: 'Puntos por partido',
+        data: dataPoints,
+        borderColor: '#f0b310',
+        backgroundColor: 'rgba(240, 179, 16, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: '#f0b310',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 3,
+          ticks: { color: '#9ca3af', stepSize: 1 },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        x: {
+          ticks: { color: '#9ca3af' },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+// Weight slider synchronization
+function setupWeightSliders() {
+  const fifaInput = document.getElementById('input-weight-fifa');
+  const fifaSlider = document.getElementById('slider-weight-fifa');
+  const h2hInput = document.getElementById('input-weight-h2h');
+  const h2hSlider = document.getElementById('slider-weight-h2h');
+  const decayInput = document.getElementById('input-decay');
+  const decaySlider = document.getElementById('slider-decay');
+  const sumDisplay = document.getElementById('weights-sum-display');
+  const histFormDisplay = document.getElementById('historical-form-display');
+  
+  if (!fifaInput || !fifaSlider || !h2hInput || !h2hSlider || !decayInput || !decaySlider) return;
+  
+  // Sync FIFA slider and input
+  fifaSlider.addEventListener('input', () => {
+    fifaInput.value = fifaSlider.value;
+    updateWeightsSummary();
+  });
+  
+  fifaInput.addEventListener('input', () => {
+    let val = parseInt(fifaInput.value) || 0;
+    val = Math.max(0, Math.min(100, val));
+    fifaSlider.value = val;
+    updateWeightsSummary();
+  });
+  
+  // Sync H2H slider and input
+  h2hSlider.addEventListener('input', () => {
+    h2hInput.value = h2hSlider.value;
+    updateWeightsSummary();
+  });
+  
+  h2hInput.addEventListener('input', () => {
+    let val = parseInt(h2hInput.value) || 0;
+    val = Math.max(0, Math.min(100, val));
+    h2hSlider.value = val;
+    updateWeightsSummary();
+  });
+  
+  // Sync Decay slider and input
+  decaySlider.addEventListener('input', () => {
+    decayInput.value = decaySlider.value;
+  });
+  
+  decayInput.addEventListener('input', () => {
+    let val = parseInt(decayInput.value) || 18;
+    val = Math.max(3, Math.min(60, val));
+    decaySlider.value = val;
+  });
+  
+  // Update weights summary
+  function updateWeightsSummary() {
+    const fifaVal = parseInt(fifaInput.value) || 0;
+    const h2hVal = parseInt(h2hInput.value) || 0;
+    const sum = fifaVal + h2hVal;
+    const historicalForm = 100 - sum;
+    
+    if (histFormDisplay) {
+      histFormDisplay.innerHTML = `Forma Histórica: <strong>${historicalForm}%</strong>`;
+    }
+    
+    if (sumDisplay) {
+      sumDisplay.innerHTML = `Suma FIFA+H2H: <strong>${sum}%</strong> (Forma: ${historicalForm}%)`;
+      if (sum > 100) {
+        sumDisplay.classList.add('error');
+        sumDisplay.innerHTML += ' ⚠️';
+      } else {
+        sumDisplay.classList.remove('error');
+      }
+    }
+  }
+  
+  // Initial update
+  updateWeightsSummary();
+}
+
+// Event listeners for modal
+if (btnModalClose) {
+  btnModalClose.addEventListener('click', closeTeamModal);
+}
+
+if (modalOverlay) {
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) {
+      closeTeamModal();
+    }
+  });
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modalOverlay?.classList.contains('active')) {
+    closeTeamModal();
+  }
+});
+
+// View details buttons
+btnViewDetails.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const teamLetter = btn.getAttribute('data-team');
+    openTeamModal(teamLetter);
+  });
+});
+
+// Initialize weight sliders when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupWeightSliders);
+} else {
+  setupWeightSliders();
+}

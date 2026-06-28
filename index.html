@@ -257,21 +257,29 @@
       <div class="config-group group-teams">
         <div class="config-group-title">Equipos y Ranking</div>
         <div class="config-group-fields">
-          <div class="config-item flex-field">
+          <div class="config-item team-select-item">
             <label for="select-team-a">Selección A</label>
             <select id="select-team-a" class="custom-select"></select>
+            <div class="team-info-row">
+              <span class="team-rank-label">Rank:</span>
+              <input type="number" id="input-rank-a" min="1" max="211" value="16" class="param-input rank-input">
+            </div>
+            <button type="button" class="btn-view-details" data-team="a">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Ver Detalles
+            </button>
           </div>
-          <div class="config-item compact-field" style="width: 65px;">
-            <label for="input-rank-a">Rank A</label>
-            <input type="number" id="input-rank-a" min="1" max="211" value="16" class="param-input" style="width: 100%;">
-          </div>
-          <div class="config-item flex-field">
+          <div class="config-item team-select-item">
             <label for="select-team-b">Selección B</label>
             <select id="select-team-b" class="custom-select"></select>
-          </div>
-          <div class="config-item compact-field" style="width: 65px;">
-            <label for="input-rank-b">Rank B</label>
-            <input type="number" id="input-rank-b" min="1" max="211" value="61" class="param-input" style="width: 100%;">
+            <div class="team-info-row">
+              <span class="team-rank-label">Rank:</span>
+              <input type="number" id="input-rank-b" min="1" max="211" value="61" class="param-input rank-input">
+            </div>
+            <button type="button" class="btn-view-details" data-team="b">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Ver Detalles
+            </button>
           </div>
         </div>
       </div>
@@ -288,26 +296,38 @@
         <div id="user-presets-row" style="margin-bottom: 8px; display: flex; gap: 4px; flex-wrap: wrap; display: none;">
           <!-- Populated dynamically via JS -->
         </div>
-        <div class="config-group-fields">
-          <div class="config-item compact-field" style="width: 85px;">
-            <label for="input-weight-fifa">Pond. FIFA (%)</label>
-            <input type="number" id="input-weight-fifa" min="0" max="100" value="30" class="param-input" style="width: 100%;">
+        <div class="config-group-fields weights-fields">
+          <div class="weight-slider-item">
+            <div class="weight-label-row">
+              <label for="input-weight-fifa">FIFA %</label>
+              <input type="number" id="input-weight-fifa" min="0" max="100" value="30" class="param-input weight-input">
+            </div>
+            <input type="range" id="slider-weight-fifa" min="0" max="100" value="30" class="weight-slider">
           </div>
-          <div class="config-item compact-field" style="width: 85px;">
-            <label for="input-weight-h2h">Pond. H2H (%)</label>
-            <input type="number" id="input-weight-h2h" min="0" max="100" value="20" class="param-input" style="width: 100%;">
+          <div class="weight-slider-item">
+            <div class="weight-label-row">
+              <label for="input-weight-h2h">H2H %</label>
+              <input type="number" id="input-weight-h2h" min="0" max="100" value="20" class="param-input weight-input">
+            </div>
+            <input type="range" id="slider-weight-h2h" min="0" max="100" value="20" class="weight-slider">
           </div>
-          <div class="config-item compact-field" style="width: 75px;">
-            <label for="input-decay">Decay (m)</label>
-            <input type="number" id="input-decay" min="3" max="60" value="18" class="param-input" style="width: 100%;">
+          <div class="weight-slider-item">
+            <div class="weight-label-row">
+              <label for="input-decay">Decay (m)</label>
+              <input type="number" id="input-decay" min="3" max="60" value="18" class="param-input weight-input">
+            </div>
+            <input type="range" id="slider-decay" min="3" max="60" value="18" class="weight-slider">
           </div>
-          <div class="config-item compact-field" style="width: 95px;">
+        </div>
+        <div class="weights-summary-row">
+          <span id="weights-sum-display">Suma: <strong>100%</strong></span>
+          <span id="historical-form-display">Forma Histórica: <strong>50%</strong></span>
+        </div>
+        <div class="config-group-fields sims-field-row">
+          <div class="config-item compact-field sims-input-wrapper">
             <label for="input-sims">Simulaciones</label>
             <input type="number" id="input-sims" min="1000" max="100000" step="1000" value="100000" class="param-input" style="width: 100%;">
           </div>
-        </div>
-        <div id="weights-formula-preview" style="font-size: 0.72rem; color: var(--color-primary); margin-top: 6px; font-weight: 600; text-align: left; padding: 4px 8px; background: rgba(99,102,241,0.08); border-radius: 4px; border-left: 3px solid var(--color-primary);">
-          Distribución Real: FIFA 30% | H2H 20% | Forma Histórica 50%
         </div>
       </div>
 
@@ -1243,6 +1263,76 @@
   </main>
     
     <!-- Footer -->
+
+  <!-- Team Details Modal -->
+  <div id="team-details-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span id="modal-team-flag" class="modal-team-flag">🇺🇾</span>
+          <h2 id="modal-team-name" class="modal-team-name">URUGUAY</h2>
+        </div>
+        <button type="button" class="btn-modal-close" aria-label="Cerrar modal">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      
+      <div class="modal-content">
+        <!-- Rankings Section -->
+        <div class="modal-rankings-section">
+          <div class="ranking-badge">
+            <span class="ranking-label">Rank FIFA</span>
+            <span id="modal-fifa-rank" class="ranking-value">#1</span>
+          </div>
+          <div class="ranking-badge">
+            <span class="ranking-label">Elo Rating</span>
+            <span id="modal-elo-rating" class="ranking-value">1922</span>
+          </div>
+        </div>
+        
+        <!-- Recent Form Section -->
+        <section class="modal-section">
+          <h3 class="modal-section-title">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+            Forma Reciente (Últimos 10)
+          </h3>
+          <div id="modal-form-badges" class="form-badges-container"></div>
+          <canvas id="modal-form-chart" width="400" height="100"></canvas>
+        </section>
+        
+        <!-- Stats Grid -->
+        <div class="modal-stats-grid">
+          <section class="modal-section">
+            <h3 class="modal-section-title">Estadísticas Ofensivas</h3>
+            <div class="stats-list">
+              <div class="stat-row"><span class="stat-label">Goles a favor (últ. 10):</span><span id="modal-goals-for" class="stat-value">18</span></div>
+              <div class="stat-row"><span class="stat-label">xG promedio:</span><span id="modal-xg-for" class="stat-value">1.8</span></div>
+              <div class="stat-row"><span class="stat-label">Tiros por partido:</span><span id="modal-shots-for" class="stat-value">14.2</span></div>
+            </div>
+          </section>
+          
+          <section class="modal-section">
+            <h3 class="modal-section-title">Estadísticas Defensivas</h3>
+            <div class="stats-list">
+              <div class="stat-row"><span class="stat-label">Goles en contra:</span><span id="modal-goals-against" class="stat-value">8</span></div>
+              <div class="stat-row"><span class="stat-label">Clean sheets:</span><span id="modal-clean-sheets" class="stat-value">40%</span></div>
+              <div class="stat-row"><span class="stat-label">Tiros recibidos:</span><span id="modal-shots-against" class="stat-value">9.1</span></div>
+            </div>
+          </section>
+        </div>
+        
+        <section class="modal-section">
+          <h3 class="modal-section-title">Goleadores Principales</h3>
+          <ul id="modal-top-scorers" class="scorers-list"></ul>
+        </section>
+        
+        <section class="modal-section">
+          <h3 class="modal-section-title">Rendimiento por Competición</h3>
+          <div id="modal-competition-stats" class="competition-stats"></div>
+        </section>
+      </div>
+    </div>
+  </div>
     <footer class="app-footer">
       <p>Diseño premium desarrollado para el análisis estadístico del Mundial 2026. Los cálculos de probabilidad de goles se basan en el método Dixon-Coles (1997).</p>
     </footer>
